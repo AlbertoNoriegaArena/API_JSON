@@ -8,6 +8,7 @@ import com.ejemploAPI.repositories.AttributeTypeRepository;
 import com.ejemploAPI.repositories.ConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Service
+@Transactional
 public class JsonConfigService {
 
     private final ConfigRepository configRepository;
@@ -60,7 +62,7 @@ public class JsonConfigService {
         if (value instanceof Map) {
             // Es un objeto: tipo NODE
             config.setDefaultValue(null);
-            Config savedConfig = configRepository.save(config);
+            Config savedConfig = saveOrGetConfig(config);
             
             // Procesar hijos recursivamente
             Map<String, Object> mapValue = (Map<String, Object>) value;
@@ -70,7 +72,7 @@ public class JsonConfigService {
         } else if (value instanceof List) {
             // Es una lista
             config.setDefaultValue(null);
-            Config savedConfig = configRepository.save(config);
+            Config savedConfig = saveOrGetConfig(config);
             
             List<?> listValue = (List<?>) value;
             for (int i = 0; i < listValue.size(); i++) {
@@ -86,26 +88,55 @@ public class JsonConfigService {
                     itemConfig.setAttribute(attr);
                     itemConfig.setParent(savedConfig);
                     itemConfig.setDefaultValue(itemValue);
-                    configRepository.save(itemConfig);
+                    saveOrGetConfig(itemConfig);
                 }
             }
         } else {
             // Es un valor primitivo (STRING, NUMERIC, BOOLEAN)
             config.setDefaultValue(value != null ? value.toString() : "");
-            configRepository.save(config);
+            saveOrGetConfig(config);
         }
+    }
+
+    /**
+     * Guarda el config si no existe uno equivalente (mismo attribute, mismo parent y mismo defaultValue),
+     * o devuelve el existente para evitar duplicados.
+     */
+    private Config saveOrGetConfig(Config cfg) {
+        Long attributeId = cfg.getAttribute() != null ? cfg.getAttribute().getId() : null;
+        Long parentId = cfg.getParent() != null ? cfg.getParent().getId() : null;
+        String defVal = cfg.getDefaultValue();
+        // Buscar entre los hijos del parent (o entre raíces si parentId == null)
+        List<Config> candidates;
+        if (parentId != null) {
+            candidates = configRepository.findByParentIdOrderByIdAsc(parentId);
+        } else {
+            candidates = configRepository.findByParentIsNull();
+        }
+
+        for (Config c : candidates) {
+            Long cAttrId = c.getAttribute() != null ? c.getAttribute().getId() : null;
+            String cDef = c.getDefaultValue();
+            if (attributeId != null && attributeId.equals(cAttrId)) {
+                if (defVal == null && cDef == null) {
+                    return c;
+                }
+                if (defVal != null && defVal.equals(cDef)) {
+                    return c;
+                }
+            }
+        }
+
+        return configRepository.save(cfg);
     }
 
     //Obtiene un Attribute existente o lo crea
 
     private Attribute getOrCreateAttribute(String name, Object value) {
-        // Buscar por name
-        List<Attribute> existing = attributeRepository.findAll().stream()
-                .filter(a -> a.getName().equals(name))
-                .toList();
-
-        if (!existing.isEmpty()) {
-            return existing.get(0);
+        // Buscar por name usando método de repositorio
+        Optional<Attribute> existing = attributeRepository.findFirstByName(name);
+        if (existing.isPresent()) {
+            return existing.get();
         }
 
         // Crear nuevo Attribute
@@ -123,43 +154,49 @@ public class JsonConfigService {
      * Determina el tipo de atributo según el valor
      */
     private AttributeType determineAttributeType(Object value) {
-        AttributeType type = new AttributeType();
+        String typeStr;
+        Boolean isList = false;
+        Boolean isEnum = false;
 
         if (value instanceof Map) {
-            type.setType("NODE");
-            type.setIsEnum(false);
-            type.setIsList(false);
+            typeStr = "NODE";
+            isList = false;
         } else if (value instanceof List) {
+            isList = true;
             List<?> list = (List<?>) value;
             if (!list.isEmpty()) {
                 Object first = list.get(0);
                 if (first instanceof Map) {
-                    type.setType("NODE");
-                    type.setIsList(true);
-                    type.setIsEnum(false);
+                    typeStr = "NODE";
                 } else if (first instanceof Number) {
-                    type.setType("NUMERIC");
-                    type.setIsList(true);
-                    type.setIsEnum(false);
+                    typeStr = "NUMERIC";
+                } else if (first instanceof Boolean) {
+                    typeStr = "BOOLEAN";
                 } else {
-                    type.setType("STRING");
-                    type.setIsList(true);
-                    type.setIsEnum(false);
+                    typeStr = "STRING";
                 }
+            } else {
+                // Lista vacía: asumir STRING list
+                typeStr = "STRING";
             }
         } else if (value instanceof Boolean) {
-            type.setType("BOOLEAN");
-            type.setIsEnum(false);
-            type.setIsList(false);
+            typeStr = "BOOLEAN";
         } else if (value instanceof Number) {
-            type.setType("NUMERIC");
-            type.setIsEnum(false);
-            type.setIsList(false);
+            typeStr = "NUMERIC";
         } else {
-            type.setType("STRING");
-            type.setIsEnum(false);
-            type.setIsList(false);
+            typeStr = "STRING";
         }
+
+        // Intentar reusar AttributeType existente
+        Optional<AttributeType> existing = attributeTypeRepository.findByTypeAndIsListAndIsEnum(typeStr, isList, isEnum);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        AttributeType type = new AttributeType();
+        type.setType(typeStr);
+        type.setIsList(isList);
+        type.setIsEnum(isEnum);
 
         return attributeTypeRepository.save(type);
     }
@@ -169,9 +206,7 @@ public class JsonConfigService {
      */
     public String exportToJson() {
         // Obtener los Configs raíz (sin padre)
-        List<Config> rootConfigs = configRepository.findAll().stream()
-                .filter(c -> c.getParent() == null)
-                .toList();
+        List<Config> rootConfigs = configRepository.findByParentIsNull();
 
         Map<String, Object> result = new LinkedHashMap<>();
 
@@ -195,9 +230,7 @@ public class JsonConfigService {
      */
     private Object buildJsonValue(Config config) {
         // Obtener hijos
-        List<Config> children = configRepository.findAll().stream()
-                .filter(c -> config.getId().equals(c.getParent() != null ? c.getParent().getId() : null))
-                .toList();
+        List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
 
         if (children.isEmpty()) {
             // Es una hoja: retornar el valor primitivo
@@ -224,7 +257,9 @@ public class JsonConfigService {
                 }
             }
             return value;
-        } else if (config.getAttribute().getAttributeType().getIsList() != null && 
+        } else if (config.getAttribute() != null &&
+                   config.getAttribute().getAttributeType() != null &&
+                   config.getAttribute().getAttributeType().getIsList() != null &&
                    config.getAttribute().getAttributeType().getIsList()) {
             // Es una lista
             List<Object> list = new java.util.ArrayList<>();
