@@ -9,4 +9,8 @@ import java.util.Optional;
 @Repository
 public interface AttributeTypeRepository extends JpaRepository<AttributeType, Long> {
 	Optional<AttributeType> findByTypeAndIsListAndIsEnum(String type, Boolean isList, Boolean isEnum);
+
+	// Case-insensitive lookup useful to match JSON attribute names to enum types
+	Optional<AttributeType> findByTypeIgnoreCaseAndIsListAndIsEnum(String type, Boolean isList, Boolean isEnum);
+	Optional<AttributeType> findByTypeIgnoreCase(String type);
 }
