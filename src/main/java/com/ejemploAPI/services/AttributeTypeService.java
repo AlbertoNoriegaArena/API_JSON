@@ -4,8 +4,12 @@ import com.ejemploAPI.models.AttributeType;
 import com.ejemploAPI.models.AttributeTypeValue;
 import com.ejemploAPI.repositories.AttributeTypeRepository;
 import com.ejemploAPI.repositories.AttributeTypeValueRepository;
+
+import org.springframework.transaction.annotation.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -102,5 +106,24 @@ public class AttributeTypeService {
                 .replaceAll("\\p{M}", "") // elimina acentos
                 .toLowerCase()
                 .trim();
+    }
+
+    // Si es una lista de enumerados, busca o crea el tipo correspondiente sin machacar el original
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AttributeType findOrCreateListEnumType(AttributeType baseEnumType) {
+        if (baseEnumType == null || !Boolean.TRUE.equals(baseEnumType.getIsEnum())
+                || Boolean.TRUE.equals(baseEnumType.getIsList())) {
+            return baseEnumType;
+        }
+
+        return attributeTypeRepository
+                .findByTypeIgnoreCaseAndIsListAndIsEnum(baseEnumType.getType(), true, true)
+                .orElseGet(() -> {
+                    AttributeType listCopy = new AttributeType();
+                    listCopy.setType(baseEnumType.getType());
+                    listCopy.setIsEnum(true);
+                    listCopy.setIsList(true);
+                    return attributeTypeRepository.save(listCopy);
+                });
     }
 }

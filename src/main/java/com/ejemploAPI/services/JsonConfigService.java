@@ -47,16 +47,19 @@ public class JsonConfigService {
     private AttributeType inferEnumTypeForList(String attributeName, List<?> items) {
 
         List<AttributeType> enumTypes = attributeTypeRepository.findByIsEnum(true);
-        if (enumTypes == null || enumTypes.isEmpty()) return null;
+        if (enumTypes == null || enumTypes.isEmpty())
+            return null;
 
         AttributeType best = null;
         int bestMatches = 0;
         for (AttributeType at : enumTypes) {
             int matches = 0;
             for (Object item : items) {
-                if (item == null) continue;
+                if (item == null)
+                    continue;
                 String s = item.toString();
-                if (attributeTypeService.findClosestAllowedValue(at, s) != null) matches++;
+                if (attributeTypeService.findClosestAllowedValue(at, s) != null)
+                    matches++;
             }
             if (matches > bestMatches) {
                 bestMatches = matches;
@@ -67,7 +70,8 @@ public class JsonConfigService {
     }
 
     private void preScanAndRegisterTypes(Map<String, Object> jsonMap) {
-        if (jsonMap == null) return;
+        if (jsonMap == null)
+            return;
         for (Map.Entry<String, Object> entry : jsonMap.entrySet()) {
             preScanNode(entry.getKey(), entry.getValue());
         }
@@ -77,17 +81,20 @@ public class JsonConfigService {
         // Si es un mapa llama recursivamente a sus campos
         if (value instanceof Map) {
             Map<String, Object> map = (Map<String, Object>) value;
-            for (Map.Entry<String, Object> e : map.entrySet()) preScanNode(e.getKey(), e.getValue());
-            // Si es una lista, registra atributo como lista (ensureAttributeForList) y procesar elementos
+            for (Map.Entry<String, Object> e : map.entrySet())
+                preScanNode(e.getKey(), e.getValue());
+            // Si es una lista, registra atributo como lista (ensureAttributeForList) y
+            // procesar elementos
         } else if (value instanceof List) {
             List<?> list = (List<?>) value;
-            
+
             ensureAttributeForList(name, list);
-            
+
             for (Object item : list) {
                 if (item instanceof Map) {
                     Map<String, Object> mapItem = (Map<String, Object>) item;
-                    for (Map.Entry<String, Object> e : mapItem.entrySet()) preScanNode(e.getKey(), e.getValue());
+                    for (Map.Entry<String, Object> e : mapItem.entrySet())
+                        preScanNode(e.getKey(), e.getValue());
                 }
             }
         } else {
@@ -100,28 +107,39 @@ public class JsonConfigService {
             Optional<Attribute> existing = attributeRepository.findFirstByName(name);
             if (existing.isPresent()) {
                 Attribute attr = existing.get();
-                // if already enum-list, nothing to do
-                if (attr.getAttributeType() != null && Boolean.TRUE.equals(attr.getAttributeType().getIsEnum()) && Boolean.TRUE.equals(attr.getAttributeType().getIsList())) return;
-                // try infer enum by content
+
+                // si ya es enum-list, nada que hacer
+                if (attr.getAttributeType() != null && Boolean.TRUE.equals(attr.getAttributeType().getIsEnum())
+                        && Boolean.TRUE.equals(attr.getAttributeType().getIsList()))
+                    return;
+
+                // inferir enum por contenido
                 AttributeType inferred = inferEnumTypeForList(name, listValue);
                 if (inferred != null) {
+                    AttributeType listEnum;
+
+                    // si el enum existente no es lista, crear un nuevo AttributeType para lista
                     if (!Boolean.TRUE.equals(inferred.getIsList())) {
-                        inferred.setIsList(true);
-                        attributeTypeRepository.save(inferred);
+                        listEnum = attributeTypeService.findOrCreateListEnumType(inferred);
+                    } else {
+                        listEnum = inferred;
                     }
-                    attr.setAttributeType(inferred);
+
+                    attr.setAttributeType(listEnum);
                     attributeRepository.save(attr);
                 }
                 return;
             }
 
-            // not existing -> create attribute with determineAttributeType (will set isList true)
+            // si no existe -> crear atributo con determineAttributeType (ya manejará
+            // isList)
             Attribute attr = new Attribute();
             attr.setName(name);
             AttributeType at = determineAttributeType(listValue, name);
             attr.setAttributeType(at);
             attributeRepository.save(attr);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     private void ensureAttributeForPrimitive(String name, Object value) {
@@ -129,7 +147,8 @@ public class JsonConfigService {
             Optional<Attribute> existing = attributeRepository.findFirstByName(name);
             if (existing.isPresent()) {
                 Attribute attr = existing.get();
-                if (attr.getAttributeType() != null && Boolean.TRUE.equals(attr.getAttributeType().getIsEnum())) return;
+                if (attr.getAttributeType() != null && Boolean.TRUE.equals(attr.getAttributeType().getIsEnum()))
+                    return;
                 String valStr = value != null ? value.toString() : null;
                 if (valStr != null && !valStr.isEmpty()) {
                     List<AttributeType> enumTypes = attributeTypeRepository.findByIsEnum(true);
@@ -146,19 +165,22 @@ public class JsonConfigService {
                 return;
             }
 
-            // not existing -> create attribute (determineAttributeType will infer enum by content)
+            // not existing -> create attribute (determineAttributeType will infer enum by
+            // content)
             Attribute attr = new Attribute();
             attr.setName(name);
             AttributeType at = determineAttributeType(value, name);
             attr.setAttributeType(at);
             attributeRepository.save(attr);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     // Método gestiona la persistencia real y la validación
     private void processJsonNode(String attributeName, Object value, Long parentId) {
         Attribute attr = getOrCreateAttribute(attributeName, value);
-        if (attr == null) return;
+        if (attr == null)
+            return;
 
         Config config = new Config();
         config.setAttribute(attr);
@@ -180,17 +202,19 @@ public class JsonConfigService {
             Config savedConfig = saveOrGetConfig(config);
 
             List<?> listValue = (List<?>) value;
-            // Si el atributo aún no está marcado como enum, intentar inferir un AttributeType enum
+            // Si el atributo aún no está marcado como enum, intentar inferir un
+            // AttributeType enum
             // a partir del contenido de la lista.
             if (attr.getAttributeType() == null || !Boolean.TRUE.equals(attr.getAttributeType().getIsEnum())) {
                 AttributeType inferred = inferEnumTypeForList(attributeName, listValue);
                 if (inferred != null) {
+                    AttributeType listEnumType = inferred;
                     // Asegurarse de que isList=true para este enum
-                    if (!Boolean.TRUE.equals(inferred.getIsList())) {
-                        inferred.setIsList(true);
-                        attributeTypeRepository.save(inferred);
+                    if (!Boolean.TRUE.equals(listEnumType.getIsList())) {
+                        // No modificar el 'inferred' original, clonarlo como lista
+                        listEnumType = attributeTypeService.findOrCreateListEnumType(inferred);
                     }
-                    attr.setAttributeType(inferred);
+                    attr.setAttributeType(listEnumType);
                     attributeRepository.save(attr);
                 }
             }
@@ -205,16 +229,24 @@ public class JsonConfigService {
                     itemConfig.setParent(savedConfig);
 
                     // Mapear al valor permitido en BBDD si es enum
-                    if (attr.getAttributeType() != null && Boolean.TRUE.equals(attr.getAttributeType().getIsEnum())) {
-                        String mappedValue = attributeTypeService.findClosestAllowedValue(attr.getAttributeType(), itemValue);
+                    AttributeType listAttributeType = attr.getAttributeType();
+                    if (listAttributeType != null && Boolean.TRUE.equals(listAttributeType.getIsEnum())) {
+                        // Para validar, necesitamos el AttributeType base (no-lista) del enum.
+                        // El tipo base tiene el mismo 'type' pero con isList=false.
+                        AttributeType baseEnumType = attributeTypeRepository
+                                .findByTypeIgnoreCaseAndIsListAndIsEnum(listAttributeType.getType(), false, true)
+                                .orElse(listAttributeType); // Fallback al tipo de la lista si no se encuentra el base
+
+                        String mappedValue = attributeTypeService.findClosestAllowedValue(baseEnumType, itemValue);
 
                         if (mappedValue != null) {
                             // Valor válido → guardamos el permitido
                             itemConfig.setDefaultValue(mappedValue);
                         } else {
-                        // Valor inválido → rechazamos la importación con 400 e incluimos valores permitidos
-                        List<String> valoresPermitidosEnum = attributeTypeService.getAllowedValues(attr.getAttributeType());
-                        throw new InvalidEnumValueException(attributeName, itemValue, valoresPermitidosEnum);
+                            // Valor inválido → rechazamos la importación con 400 e incluimos valores
+                            // permitidos
+                            throw new InvalidEnumValueException(attributeName, itemValue,
+                                    attributeTypeService.getAllowedValues(baseEnumType));
 
                         }
                     } else {
@@ -228,7 +260,8 @@ public class JsonConfigService {
             String primitiveValue = value != null ? value.toString() : "";
 
             // Si el attribute no está marcado como enum, intentar inferir por contenido
-            if ((attr.getAttributeType() == null || !Boolean.TRUE.equals(attr.getAttributeType().getIsEnum())) && primitiveValue != null && !primitiveValue.isEmpty()) {
+            if ((attr.getAttributeType() == null || !Boolean.TRUE.equals(attr.getAttributeType().getIsEnum()))
+                    && primitiveValue != null && !primitiveValue.isEmpty()) {
                 List<AttributeType> enumTypes = attributeTypeRepository.findByIsEnum(true);
                 if (enumTypes != null && !enumTypes.isEmpty()) {
                     for (AttributeType at : enumTypes) {
@@ -246,11 +279,13 @@ public class JsonConfigService {
 
             // Mapear valor permitido si es enum
             if (attr.getAttributeType() != null && Boolean.TRUE.equals(attr.getAttributeType().getIsEnum())) {
-                String mappedValue = attributeTypeService.findClosestAllowedValue(attr.getAttributeType(), primitiveValue);
+                String mappedValue = attributeTypeService.findClosestAllowedValue(attr.getAttributeType(),
+                        primitiveValue);
                 if (mappedValue != null) {
                     config.setDefaultValue(mappedValue);
                 } else {
-                    // Valor no permitido: rechazamos la importación con 400 e incluimos valores permitidos
+                    // Valor no permitido: rechazamos la importación con 400 e incluimos valores
+                    // permitidos
                     List<String> valoresPermitidosEnum = attributeTypeService.getAllowedValues(attr.getAttributeType());
                     throw new InvalidEnumValueException(attributeName, primitiveValue, valoresPermitidosEnum);
                 }
@@ -266,9 +301,8 @@ public class JsonConfigService {
         Long attributeId = cfg.getAttribute() != null ? cfg.getAttribute().getId() : null;
         Long parentId = cfg.getParent() != null ? cfg.getParent().getId() : null;
         String defVal = cfg.getDefaultValue();
-        List<Config> candidates = parentId != null ?
-                configRepository.findByParentIdOrderByIdAsc(parentId) :
-                configRepository.findByParentIsNull();
+        List<Config> candidates = parentId != null ? configRepository.findByParentIdOrderByIdAsc(parentId)
+                : configRepository.findByParentIsNull();
 
         for (Config c : candidates) {
             Long cAttrId = c.getAttribute() != null ? c.getAttribute().getId() : null;
@@ -287,12 +321,14 @@ public class JsonConfigService {
         Optional<Attribute> existing = attributeRepository.findFirstByName(name);
         if (existing.isPresent()) {
             Attribute attr = existing.get();
-            // Si el attribute ya existe, intentar forzar la asociación al AttributeType enum
+            // Si el attribute ya existe, intentar forzar la asociación al AttributeType
+            // enum
             // cuando exista uno con el mismo nombre (case-insensitive).
             try {
                 boolean valIsList = value instanceof List;
-                Optional<AttributeType> maybeType = attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(name, valIsList, true);
-                if (maybeType.isPresent()) {
+                Optional<AttributeType> maybeType = attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(name,
+                        valIsList, true);
+                if (maybeType.isPresent() && value instanceof List) {
                     AttributeType enumType = maybeType.get();
                     // Sobrescribe la asociación si el attribute no tenía tipo o no era enum
                     if (attr.getAttributeType() == null || !Boolean.TRUE.equals(attr.getAttributeType().getIsEnum())) {
@@ -300,8 +336,10 @@ public class JsonConfigService {
                         attributeRepository.save(attr);
                     }
                 }
-                // Si el valor es primitivo y el atributo actual no es enum, intentar inferir por contenido
-                else if (!(value instanceof Map) && !(value instanceof List) && (attr.getAttributeType() == null || !Boolean.TRUE.equals(attr.getAttributeType().getIsEnum()))) {
+                // Si el valor es primitivo y el atributo actual no es enum, intentar inferir
+                // por contenido
+                else if (!(value instanceof Map) && !(value instanceof List) && (attr.getAttributeType() == null
+                        || !Boolean.TRUE.equals(attr.getAttributeType().getIsEnum()))) {
                     String valStr = value != null ? value.toString() : null;
                     if (valStr != null && !valStr.isEmpty()) {
                         List<AttributeType> enumTypes = attributeTypeRepository.findByIsEnum(true);
@@ -316,7 +354,8 @@ public class JsonConfigService {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             return attr;
         }
 
@@ -334,25 +373,35 @@ public class JsonConfigService {
         boolean isList = false;
         boolean isEnum = false;
 
-        if (value instanceof Map) typeStr = "NODE";
+        if (value instanceof Map)
+            typeStr = "NODE";
         else if (value instanceof List) {
             isList = true;
             List<?> list = (List<?>) value;
             if (!list.isEmpty()) {
                 Object first = list.get(0);
-                if (first instanceof Map) typeStr = "NODE";
-                else if (first instanceof Number) typeStr = "NUMERIC";
-                else if (first instanceof Boolean) typeStr = "BOOLEAN";
-                else typeStr = "STRING";
-            } else typeStr = "STRING";
-        } else if (value instanceof Boolean) typeStr = "BOOLEAN";
-        else if (value instanceof Number) typeStr = "NUMERIC";
-        else typeStr = "STRING";
+                if (first instanceof Map)
+                    typeStr = "NODE";
+                else if (first instanceof Number)
+                    typeStr = "NUMERIC";
+                else if (first instanceof Boolean)
+                    typeStr = "BOOLEAN";
+                else
+                    typeStr = "STRING";
+            } else
+                typeStr = "STRING";
+        } else if (value instanceof Boolean)
+            typeStr = "BOOLEAN";
+        else if (value instanceof Number)
+            typeStr = "NUMERIC";
+        else
+            typeStr = "STRING";
 
         // Buscar si ya existe un AttributeType enum con el flag isList correcto
-        Optional<AttributeType> enumType =
-            attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(attributeName, isList, true);
-        if (enumType.isPresent()) return enumType.get();
+        Optional<AttributeType> enumType = attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(attributeName,
+                isList, true);
+        if (enumType.isPresent())
+            return enumType.get();
 
         // Si es un valor primitivo (no lista ni nodo), intentar inferir por contenido
         if (!isList && !(value instanceof Map) && value != null) {
@@ -366,12 +415,14 @@ public class JsonConfigService {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
 
-        Optional<AttributeType> existing =
-            attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(typeStr, isList, false);
-        if (existing.isPresent()) return existing.get();
+        Optional<AttributeType> existing = attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(typeStr,
+                isList, false);
+        if (existing.isPresent())
+            return existing.get();
 
         AttributeType type = new AttributeType();
         type.setType(typeStr);
@@ -413,18 +464,32 @@ public class JsonConfigService {
                 if (childValue != null && !childValue.isEmpty()) {
                     // Si el elemento es enum, devolver valor permitido
                     if (attrType != null && Boolean.TRUE.equals(attrType.getIsEnum())) {
-                        String allowedValue = attributeTypeService.findClosestAllowedValue(attrType, childValue);
-                        if (allowedValue != null) list.add(allowedValue);
+                        // Para validar, necesitamos el AttributeType base (no-lista) del enum.
+                        AttributeType baseEnumType = attributeTypeRepository
+                                .findByTypeIgnoreCaseAndIsListAndIsEnum(attrType.getType(), false, true)
+                                .orElse(attrType); // Fallback
+
+                        String allowedValue = attributeTypeService.findClosestAllowedValue(baseEnumType, childValue);
+                        if (allowedValue != null) {
+                            list.add(allowedValue);
+                        }
+
                     } else {
                         // Convertir según tipo
                         if (attrType != null) {
                             switch (attrType.getType()) {
-                                case "BOOLEAN": list.add(Boolean.parseBoolean(childValue)); break;
-                                case "NUMERIC":
-                                    try { list.add(Double.parseDouble(childValue)); }
-                                    catch (NumberFormatException e) { list.add(childValue); }
+                                case "BOOLEAN":
+                                    list.add(Boolean.parseBoolean(childValue));
                                     break;
-                                default: list.add(childValue);
+                                case "NUMERIC":
+                                    try {
+                                        list.add(Double.parseDouble(childValue));
+                                    } catch (NumberFormatException e) {
+                                        list.add(childValue);
+                                    }
+                                    break;
+                                default:
+                                    list.add(childValue);
                             }
                         } else {
                             list.add(childValue);
@@ -437,21 +502,28 @@ public class JsonConfigService {
 
         if (children.isEmpty()) {
             String value = config.getDefaultValue();
-            if (value == null || value.isEmpty()) return null;
+            if (value == null || value.isEmpty())
+                return null;
 
             // Si es enum, devolver valor real de BBDD
             if (attrType != null && Boolean.TRUE.equals(attrType.getIsEnum())) {
                 String allowedValue = attributeTypeService.findClosestAllowedValue(attrType, value);
-                if (allowedValue != null) return allowedValue;
+                if (allowedValue != null)
+                    return allowedValue;
             }
 
             if (attrType != null) {
                 switch (attrType.getType()) {
-                    case "BOOLEAN": return Boolean.parseBoolean(value);
+                    case "BOOLEAN":
+                        return Boolean.parseBoolean(value);
                     case "NUMERIC":
-                        try { return Double.parseDouble(value); }
-                        catch (NumberFormatException e) { return value; }
-                    default: return value;
+                        try {
+                            return Double.parseDouble(value);
+                        } catch (NumberFormatException e) {
+                            return value;
+                        }
+                    default:
+                        return value;
                 }
             }
             return value;
