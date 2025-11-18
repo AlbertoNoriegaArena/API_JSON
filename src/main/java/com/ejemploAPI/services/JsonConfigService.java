@@ -8,7 +8,7 @@ import com.ejemploAPI.repositories.AttributeRepository;
 import com.ejemploAPI.repositories.AttributeTypeRepository;
 import com.ejemploAPI.repositories.ConfigRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,22 +21,25 @@ import java.util.Optional;
 @Transactional
 public class JsonConfigService {
 
-    @Autowired
     private ConfigRepository configRepository;
 
-    @Autowired
     private AttributeRepository attributeRepository;
 
-    @Autowired
     private AttributeTypeRepository attributeTypeRepository;
 
-    @Autowired
     private AttributeTypeService attributeTypeService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Inyección por constructor
+    public JsonConfigService(ConfigRepository configRepository, AttributeRepository attributeRepository, AttributeTypeRepository attributeTypeRepository, AttributeTypeService attributeTypeService) {
+        this.configRepository = configRepository;
+        this.attributeRepository = attributeRepository;
+        this.attributeTypeRepository = attributeTypeRepository;
+        this.attributeTypeService = attributeTypeService;
+    }
+
     public void importJson(Map<String, Object> jsonMap) {
-        // Primera pasada: pre-scan para inferir y registrar AttributeTypes/Attributes
         preScanAndRegisterTypes(jsonMap);
         // Segunda pasada: persistir configs y aplicar validaciones
         for (Map.Entry<String, Object> entry : jsonMap.entrySet()) {

@@ -5,11 +5,9 @@ import com.ejemploAPI.models.AttributeTypeValue;
 import com.ejemploAPI.repositories.AttributeTypeRepository;
 import com.ejemploAPI.repositories.AttributeTypeValueRepository;
 
-import org.springframework.transaction.annotation.Transactional;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,11 +16,14 @@ import java.util.Optional;
 @Service
 public class AttributeTypeService {
 
-    @Autowired
     private AttributeTypeRepository attributeTypeRepository;
 
-    @Autowired
     private AttributeTypeValueRepository attributeTypeValueRepository;
+
+    public AttributeTypeService(AttributeTypeRepository attributeTypeRepository, AttributeTypeValueRepository attributeTypeValueRepository) {
+        this.attributeTypeRepository = attributeTypeRepository;
+        this.attributeTypeValueRepository = attributeTypeValueRepository;
+    }
 
     public AttributeType ensureEnumType(String typeName) {
         Optional<AttributeType> maybe = attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(typeName, false,
