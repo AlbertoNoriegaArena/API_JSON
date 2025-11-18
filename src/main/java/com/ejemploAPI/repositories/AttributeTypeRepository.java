@@ -4,6 +4,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import com.ejemploAPI.models.AttributeType;
+
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -13,4 +15,5 @@ public interface AttributeTypeRepository extends JpaRepository<AttributeType, Lo
 	// Case-insensitive lookup useful to match JSON attribute names to enum types
 	Optional<AttributeType> findByTypeIgnoreCaseAndIsListAndIsEnum(String type, Boolean isList, Boolean isEnum);
 	Optional<AttributeType> findByTypeIgnoreCase(String type);
+	List<AttributeType> findByIsEnum(Boolean isEnum);
 }
