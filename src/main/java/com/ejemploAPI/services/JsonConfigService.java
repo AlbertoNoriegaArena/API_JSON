@@ -1,5 +1,6 @@
 package com.ejemploAPI.services;
 
+import com.ejemploAPI.config.exceptions.DuplicateKeyException;
 import com.ejemploAPI.config.exceptions.InvalidEnumValueException;
 import com.ejemploAPI.models.Attribute;
 import com.ejemploAPI.models.AttributeType;
@@ -7,6 +8,8 @@ import com.ejemploAPI.models.Config;
 import com.ejemploAPI.repositories.AttributeRepository;
 import com.ejemploAPI.repositories.AttributeTypeRepository;
 import com.ejemploAPI.repositories.ConfigRepository;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.stereotype.Service;
@@ -29,21 +32,34 @@ public class JsonConfigService {
 
     private AttributeTypeService attributeTypeService;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     // Inyección por constructor
-    public JsonConfigService(ConfigRepository configRepository, AttributeRepository attributeRepository, AttributeTypeRepository attributeTypeRepository, AttributeTypeService attributeTypeService) {
+    public JsonConfigService(ConfigRepository configRepository, AttributeRepository attributeRepository,
+            AttributeTypeRepository attributeTypeRepository, AttributeTypeService attributeTypeService) {
         this.configRepository = configRepository;
         this.attributeRepository = attributeRepository;
         this.attributeTypeRepository = attributeTypeRepository;
         this.attributeTypeService = attributeTypeService;
+
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
     }
 
-    public void importJson(Map<String, Object> jsonMap) {
-        preScanAndRegisterTypes(jsonMap);
-        // Segunda pasada: persistir configs y aplicar validaciones
-        for (Map.Entry<String, Object> entry : jsonMap.entrySet()) {
-            processJsonNode(entry.getKey(), entry.getValue(), null);
+    public void importJson(String rawJson) {
+        try {
+            Map<String, Object> jsonMap = objectMapper.readValue(rawJson, Map.class);
+            preScanAndRegisterTypes(jsonMap);
+
+            for (Map.Entry<String, Object> entry : jsonMap.entrySet()) {
+                processJsonNode(entry.getKey(), entry.getValue(), null);
+            }
+
+        } catch (JsonParseException e) {
+            // Esta excepción ocurre EXACTAMENTE cuando hay claves duplicadas
+            throw new DuplicateKeyException("JSON inválido: clave duplicada " + e.getOriginalMessage());
+        } catch (Exception e) {
+            throw new RuntimeException("Error procesando JSON", e);
         }
     }
 
@@ -329,7 +345,8 @@ public class JsonConfigService {
             // cuando exista uno con el mismo nombre (case-insensitive).
             try {
                 boolean valIsList = value instanceof List;
-                Optional<AttributeType> maybeType = attributeTypeRepository.findByTypeAndIsListAndIsEnum(name, valIsList, true);
+                Optional<AttributeType> maybeType = attributeTypeRepository.findByTypeAndIsListAndIsEnum(name,
+                        valIsList, true);
                 if (maybeType.isPresent() && value instanceof List) {
                     AttributeType enumType = maybeType.get();
                     // Sobrescribe la asociación si el attribute no tenía tipo o no era enum
@@ -400,7 +417,8 @@ public class JsonConfigService {
             typeStr = "STRING";
 
         // Buscar si ya existe un AttributeType enum con el flag isList correcto
-        Optional<AttributeType> enumType = attributeTypeRepository.findByTypeAndIsListAndIsEnum(attributeName, isList, true);
+        Optional<AttributeType> enumType = attributeTypeRepository.findByTypeAndIsListAndIsEnum(attributeName, isList,
+                true);
         if (enumType.isPresent())
             return enumType.get();
 

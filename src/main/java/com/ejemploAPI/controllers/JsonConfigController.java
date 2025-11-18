@@ -2,8 +2,6 @@ package com.ejemploAPI.controllers;
 
 import com.ejemploAPI.services.JsonConfigService;
 
-import java.util.Map;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,10 +16,9 @@ public class JsonConfigController {
         this.jsonConfigService = jsonConfigService;
     }
 
-
     @PostMapping("/import")
-    public ResponseEntity<String> importJson(@RequestBody Map<String, Object> jsonData) {
-        jsonConfigService.importJson(jsonData);
+    public ResponseEntity<String> importJson(@RequestBody String rawJson) {
+        jsonConfigService.importJson(rawJson);
         return ResponseEntity.ok("JSON importado correctamente");
     }
 

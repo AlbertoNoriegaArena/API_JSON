@@ -22,4 +22,9 @@ public class GlobalExceptionHandler {
                         "valores validos", ex.getAllowedValues()
                 ));
     }
+
+     @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<?> handleDuplicateKey(DuplicateKeyException ex) {
+        return ResponseEntity.badRequest().body(ex.getMessage());
+    }
 }
