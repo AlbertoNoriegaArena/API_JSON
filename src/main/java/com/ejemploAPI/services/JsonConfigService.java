@@ -104,7 +104,7 @@ public class JsonConfigService {
 
     private void ensureAttributeForList(String name, List<?> listValue) {
         try {
-            Optional<Attribute> existing = attributeRepository.findFirstByName(name);
+            Optional<Attribute> existing = attributeRepository.findByName(name);
             if (existing.isPresent()) {
                 Attribute attr = existing.get();
 
@@ -144,7 +144,7 @@ public class JsonConfigService {
 
     private void ensureAttributeForPrimitive(String name, Object value) {
         try {
-            Optional<Attribute> existing = attributeRepository.findFirstByName(name);
+            Optional<Attribute> existing = attributeRepository.findByName(name);
             if (existing.isPresent()) {
                 Attribute attr = existing.get();
                 if (attr.getAttributeType() != null && Boolean.TRUE.equals(attr.getAttributeType().getIsEnum()))
@@ -233,8 +233,8 @@ public class JsonConfigService {
                     if (listAttributeType != null && Boolean.TRUE.equals(listAttributeType.getIsEnum())) {
                         // Para validar, necesitamos el AttributeType base (no-lista) del enum.
                         // El tipo base tiene el mismo 'type' pero con isList=false.
-                        AttributeType baseEnumType = attributeTypeRepository
-                                .findByTypeIgnoreCaseAndIsListAndIsEnum(listAttributeType.getType(), false, true)
+                        AttributeType baseEnumType = attributeTypeRepository // findByTypeIgnoreCaseAndIsListAndIsEnum
+                                .findByTypeAndIsListAndIsEnum(listAttributeType.getType(), false, true)
                                 .orElse(listAttributeType); // Fallback al tipo de la lista si no se encuentra el base
 
                         String mappedValue = attributeTypeService.findClosestAllowedValue(baseEnumType, itemValue);
@@ -318,7 +318,7 @@ public class JsonConfigService {
     }
 
     private Attribute getOrCreateAttribute(String name, Object value) {
-        Optional<Attribute> existing = attributeRepository.findFirstByName(name);
+        Optional<Attribute> existing = attributeRepository.findByName(name);
         if (existing.isPresent()) {
             Attribute attr = existing.get();
             // Si el attribute ya existe, intentar forzar la asociación al AttributeType
@@ -326,8 +326,7 @@ public class JsonConfigService {
             // cuando exista uno con el mismo nombre (case-insensitive).
             try {
                 boolean valIsList = value instanceof List;
-                Optional<AttributeType> maybeType = attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(name,
-                        valIsList, true);
+                Optional<AttributeType> maybeType = attributeTypeRepository.findByTypeAndIsListAndIsEnum(name, valIsList, true);
                 if (maybeType.isPresent() && value instanceof List) {
                     AttributeType enumType = maybeType.get();
                     // Sobrescribe la asociación si el attribute no tenía tipo o no era enum
@@ -398,8 +397,7 @@ public class JsonConfigService {
             typeStr = "STRING";
 
         // Buscar si ya existe un AttributeType enum con el flag isList correcto
-        Optional<AttributeType> enumType = attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(attributeName,
-                isList, true);
+        Optional<AttributeType> enumType = attributeTypeRepository.findByTypeAndIsListAndIsEnum(attributeName, isList, true);
         if (enumType.isPresent())
             return enumType.get();
 
@@ -419,8 +417,7 @@ public class JsonConfigService {
             }
         }
 
-        Optional<AttributeType> existing = attributeTypeRepository.findByTypeIgnoreCaseAndIsListAndIsEnum(typeStr,
-                isList, false);
+        Optional<AttributeType> existing = attributeTypeRepository.findByTypeAndIsListAndIsEnum(typeStr, isList, false);
         if (existing.isPresent())
             return existing.get();
 
@@ -471,8 +468,8 @@ public class JsonConfigService {
                 if (Boolean.TRUE.equals(attrType.getIsEnum())) {
 
                     // Buscar el tipo base del enum (no-list)
-                    AttributeType baseEnumType = attributeTypeRepository
-                            .findByTypeIgnoreCaseAndIsListAndIsEnum(attrType.getType(), false, true)
+                    AttributeType baseEnumType = attributeTypeRepository // findByTypeIgnoreCaseAndIsListAndIsEnum
+                            .findByTypeAndIsListAndIsEnum(attrType.getType(), false, true)
                             .orElse(attrType);
 
                     String allowedValue = attributeTypeService.findClosestAllowedValue(baseEnumType, childValue);

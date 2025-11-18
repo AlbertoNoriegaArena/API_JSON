@@ -117,7 +117,7 @@ public class AttributeTypeService {
         }
 
         return attributeTypeRepository
-                .findByTypeIgnoreCaseAndIsListAndIsEnum(baseEnumType.getType(), true, true)
+                .findByTypeAndIsListAndIsEnum(baseEnumType.getType(), true, true)
                 .orElseGet(() -> {
                     AttributeType listCopy = new AttributeType();
                     listCopy.setType(baseEnumType.getType());
