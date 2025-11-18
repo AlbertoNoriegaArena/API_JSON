@@ -455,57 +455,59 @@ public class JsonConfigService {
         List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
         AttributeType attrType = config.getAttribute() != null ? config.getAttribute().getAttributeType() : null;
 
-        // Primero: comprobar si el atributo es una lista
+        // ------------------------------
+        // MANEJO DE LISTAS
+        // ------------------------------
         if (attrType != null && Boolean.TRUE.equals(attrType.getIsList())) {
+
             List<Object> list = new java.util.ArrayList<>();
+
             for (Config child : children) {
-                // Para listas, extraer el valor directamente de cada hijo
                 String childValue = child.getDefaultValue();
-                if (childValue != null && !childValue.isEmpty()) {
-                    // Si el elemento es enum, devolver valor permitido
-                    if (attrType != null && Boolean.TRUE.equals(attrType.getIsEnum())) {
-                        // Para validar, necesitamos el AttributeType base (no-lista) del enum.
-                        AttributeType baseEnumType = attributeTypeRepository
-                                .findByTypeIgnoreCaseAndIsListAndIsEnum(attrType.getType(), false, true)
-                                .orElse(attrType); // Fallback
+                if (childValue == null || childValue.isEmpty())
+                    continue;
 
-                        String allowedValue = attributeTypeService.findClosestAllowedValue(baseEnumType, childValue);
-                        if (allowedValue != null) {
-                            list.add(allowedValue);
-                        }
+                // ENUM LIST
+                if (Boolean.TRUE.equals(attrType.getIsEnum())) {
 
-                    } else {
-                        // Convertir según tipo
-                        if (attrType != null) {
-                            switch (attrType.getType()) {
-                                case "BOOLEAN":
-                                    list.add(Boolean.parseBoolean(childValue));
-                                    break;
-                                case "NUMERIC":
-                                    try {
-                                        list.add(Double.parseDouble(childValue));
-                                    } catch (NumberFormatException e) {
-                                        list.add(childValue);
-                                    }
-                                    break;
-                                default:
-                                    list.add(childValue);
-                            }
-                        } else {
+                    // Buscar el tipo base del enum (no-list)
+                    AttributeType baseEnumType = attributeTypeRepository
+                            .findByTypeIgnoreCaseAndIsListAndIsEnum(attrType.getType(), false, true)
+                            .orElse(attrType);
+
+                    String allowedValue = attributeTypeService.findClosestAllowedValue(baseEnumType, childValue);
+                    if (allowedValue != null)
+                        list.add(allowedValue);
+
+                } else {
+                    // LISTA NUMÉRICA / BOOLEAN / STRING
+                    switch (attrType.getType()) {
+                        case "BOOLEAN":
+                            list.add(Boolean.parseBoolean(childValue));
+                            break;
+
+                        case "NUMERIC":
+                            list.add(parseNumeros(childValue));
+                            break;
+
+                        default:
                             list.add(childValue);
-                        }
                     }
                 }
             }
+
             return list;
         }
 
+        // ------------------------------
+        // VALOR PRIMITIVO (NO LISTA)
+        // ------------------------------
         if (children.isEmpty()) {
             String value = config.getDefaultValue();
             if (value == null || value.isEmpty())
                 return null;
 
-            // Si es enum, devolver valor real de BBDD
+            // ENUM → devolver el valor real
             if (attrType != null && Boolean.TRUE.equals(attrType.getIsEnum())) {
                 String allowedValue = attributeTypeService.findClosestAllowedValue(attrType, value);
                 if (allowedValue != null)
@@ -516,30 +518,52 @@ public class JsonConfigService {
                 switch (attrType.getType()) {
                     case "BOOLEAN":
                         return Boolean.parseBoolean(value);
+
                     case "NUMERIC":
-                        try {
-                            return Double.parseDouble(value);
-                        } catch (NumberFormatException e) {
-                            return value;
-                        }
+                        return parseNumeros(value);
+
                     default:
                         return value;
                 }
             }
+
             return value;
-        } else {
-            // Es un objeto (NODE) o estructura anidada
-            Map<String, Object> obj = new LinkedHashMap<>();
-            for (Config child : children) {
-                if (child.getAttribute() != null) {
-                    String childAttrName = child.getAttribute().getName();
-                    if (childAttrName.contains("_item_"))
-                        childAttrName = childAttrName.substring(0, childAttrName.lastIndexOf("_item_"));
-                    Object childValue = buildJsonValue(child);
-                    obj.put(childAttrName, childValue);
-                }
+        }
+
+        // OBJETO / NODE
+        Map<String, Object> obj = new LinkedHashMap<>();
+        for (Config child : children) {
+            if (child.getAttribute() != null) {
+                String childAttrName = child.getAttribute().getName();
+                if (childAttrName.contains("_item_"))
+                    childAttrName = childAttrName.substring(0, childAttrName.lastIndexOf("_item_"));
+                Object childValue = buildJsonValue(child);
+                obj.put(childAttrName, childValue);
             }
-            return obj;
+        }
+        return obj;
+    }
+
+    private Object parseNumeros(String value) {
+        if (value == null)
+            return null;
+        try {
+            // Entero puro: -?123
+            if (value.matches("^-?\\d+$")) {
+                long longValue = Long.parseLong(value);
+                if (longValue >= Integer.MIN_VALUE && longValue <= Integer.MAX_VALUE) {
+                    return (int) longValue;
+                }
+                return longValue;
+            }
+
+            // Decimal: 1.23 -> Double
+            return Double.parseDouble(value);
+
+        } catch (Exception e) {
+            // fallback: devolvemos el String original si no es número
+            return value;
         }
     }
+
 }
