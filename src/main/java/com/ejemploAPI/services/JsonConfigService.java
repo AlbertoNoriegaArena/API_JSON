@@ -235,27 +235,31 @@ public class JsonConfigService {
             Optional<Config> parent = configRepository.findById(parentId);
             parent.ifPresent(config::setParent);
         }
-
         if (value instanceof Map) {
-            log.debug("Nodo '{}' detectado como MAP. Borrando hijos existentes si los hay. parentId={}", attributeName, parentId);
+            log.debug("Nodo '{}' detectado como MAP. Reemplazo completo. parentId={}", attributeName, parentId);
 
             config.setDefaultValue(null);
             Config savedConfig = saveOrGetConfig(config);
 
-            // BORRAR hijos anteriores para reemplazo completo
+            Map<String, Object> mapValue = (Map<String, Object>) value;
+
+            // BORRAR hijos existentes (recursivo) Full Replace
             List<Config> existingChildren = configRepository.findByParentIdOrderByIdAsc(savedConfig.getId());
+
             if (!existingChildren.isEmpty()) {
                 for (Config child : existingChildren) {
-                    log.debug("Eliminando hijo antiguo '{}' (id={}) de '{}'",
+                    log.debug("Eliminando recursivamente hijo antiguo '{}' (id={}) de '{}'",
                             child.getAttribute() != null ? child.getAttribute().getName() : "unknown",
                             child.getId(),
                             attributeName);
+
+                    deleteConfigRecursively(child);  // <----- BORRADO EN CASCADA REAL
                 }
-                configRepository.deleteAll(existingChildren);
             }
 
-            Map<String, Object> mapValue = (Map<String, Object>) value;
+            // Insertar nuevos hijos del JSON
             for (Map.Entry<String, Object> entry : mapValue.entrySet()) {
+                log.debug("Insertando nuevo hijo '{}' dentro de '{}'", entry.getKey(), attributeName);
                 processJsonNode(entry.getKey(), entry.getValue(), savedConfig.getId());
             }
         } else if (value instanceof List) {
@@ -311,11 +315,9 @@ public class JsonConfigService {
                             // Valor válido → guardamos el permitido
                             itemConfig.setDefaultValue(mappedValue);
                         } else {
-                            // Valor inválido → rechazamos la importación con 400 e incluimos valores
-                            // permitidos
+                            // Valor inválido → rechazamos la importación con 400 e incluimos valores permitidos
                             throw new InvalidEnumValueException(attributeName, itemValue,
                                     attributeTypeService.getAllowedValues(baseEnumType));
-
                         }
                     } else {
                         itemConfig.setDefaultValue(itemValue);
@@ -673,5 +675,21 @@ public class JsonConfigService {
             return value;
         }
     }
+
+    // Borra un nodo Config y todos sus hijos recursivamente.
+    private void deleteConfigRecursively(Config config) {
+        List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
+
+        for (Config child : children) {
+            deleteConfigRecursively(child); // borrar primero los hijos
+        }
+
+        log.debug("Borrando nodo config id={} (attribute={})",
+                config.getId(),
+                config.getAttribute() != null ? config.getAttribute().getName() : "null");
+
+        configRepository.delete(config);
+    }
+
 
 }
