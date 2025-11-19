@@ -25,7 +25,7 @@ import java.util.Optional;
 
 @Service
 @Transactional
-public class JsonConfigService {
+public class ConfigService {
 
     private final ConfigRepository configRepository;
 
@@ -37,10 +37,10 @@ public class JsonConfigService {
 
     private final ObjectMapper objectMapper;
 
-    private static final Logger log = LoggerFactory.getLogger(JsonConfigService.class);
+    private static final Logger log = LoggerFactory.getLogger(ConfigService.class);
 
     // Inyección por constructor
-    public JsonConfigService(ConfigRepository configRepository, AttributeRepository attributeRepository,
+    public ConfigService(ConfigRepository configRepository, AttributeRepository attributeRepository,
             AttributeTypeRepository attributeTypeRepository, AttributeTypeService attributeTypeService) {
         this.configRepository = configRepository;
         this.attributeRepository = attributeRepository;
