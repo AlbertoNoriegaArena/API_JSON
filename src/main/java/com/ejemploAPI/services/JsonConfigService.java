@@ -37,7 +37,7 @@ public class JsonConfigService {
 
     private final ObjectMapper objectMapper;
 
-    private static final Logger log = LoggerFactory.getLogger("MY_LOGS");
+    private static final Logger log = LoggerFactory.getLogger(JsonConfigService.class);
 
     // Inyección por constructor
     public JsonConfigService(ConfigRepository configRepository, AttributeRepository attributeRepository,

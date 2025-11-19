@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Carpeta de logs -->
+    <property name="LOG_PATH" value="logs" />
+
+    <!-- Formato de log -->
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n" />
+
+    <!-- Log en consola -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Log en archivo -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${LOG_PATH}/app.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Logs de Spring/Hibernate solo WARN -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+
+    <!-- Tus logs en DEBUG -->
+    <logger name="com.ejemploAPI.services" level="DEBUG"/>
+
+    <!-- Nivel global -->
+    <root level="DEBUG">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>
