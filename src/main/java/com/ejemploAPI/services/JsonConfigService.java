@@ -13,6 +13,8 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +27,17 @@ import java.util.Optional;
 @Transactional
 public class JsonConfigService {
 
-    private ConfigRepository configRepository;
+    private final ConfigRepository configRepository;
 
-    private AttributeRepository attributeRepository;
+    private final AttributeRepository attributeRepository;
 
-    private AttributeTypeRepository attributeTypeRepository;
+    private final AttributeTypeRepository attributeTypeRepository;
 
-    private AttributeTypeService attributeTypeService;
+    private final AttributeTypeService attributeTypeService;
 
     private final ObjectMapper objectMapper;
+
+    private static final Logger log = LoggerFactory.getLogger("MY_LOGS");
 
     // Inyección por constructor
     public JsonConfigService(ConfigRepository configRepository, AttributeRepository attributeRepository,
@@ -48,15 +52,23 @@ public class JsonConfigService {
     }
 
     public void importJson(String rawJson) {
+        log.info("Important JSON iniciada. Longitud del string recibido: {}", rawJson.length());
+
         try {
             Map<String, Object> jsonMap = objectMapper.readValue(rawJson, Map.class);
+            log.debug("JSON parseado correctamente. Keys raíz: {}", jsonMap.keySet());
             preScanAndRegisterTypes(jsonMap);
+            log.debug("Pre-scan completado");
 
             for (Map.Entry<String, Object> entry : jsonMap.entrySet()) {
+                log.debug("Procesando nodo raíz: {}", entry.getKey());
                 processJsonNode(entry.getKey(), entry.getValue(), null);
             }
 
+            log.info("Importación JSON finalizada correctamente.");
+
         } catch (JsonParseException e) {
+            log.error("Error de parseo JSON: {}", e.getOriginalMessage());
             String msg = e.getOriginalMessage();
             if (msg != null && msg.contains("Duplicate field")) {
                 throw new DuplicateKeyException("JSON inválido: clave duplicada " + msg);
@@ -64,12 +76,14 @@ public class JsonConfigService {
                 throw new InvalidJsonFormatException("JSON inválido: error de sintaxis " + msg, e);
             }
         } catch (Exception e) {
+            log.error("Error inesperado importando JSON", e);
             throw new RuntimeException("Error procesando JSON", e);
         }
     }
 
     private AttributeType inferEnumTypeForList(String attributeName, List<?> items) {
 
+        log.debug("Intentando inferir ENUM para la lista '{}', tamaño {}", attributeName, items.size());
         List<AttributeType> enumTypes = attributeTypeRepository.findByIsEnum(true);
         if (enumTypes == null || enumTypes.isEmpty())
             return null;
@@ -107,8 +121,7 @@ public class JsonConfigService {
             Map<String, Object> map = (Map<String, Object>) value;
             for (Map.Entry<String, Object> e : map.entrySet())
                 preScanNode(e.getKey(), e.getValue());
-            // Si es una lista, registra atributo como lista (ensureAttributeForList) y
-            // procesar elementos
+            // Si es una lista, registra atributo como lista (ensureAttributeForList) y procesar elementos
         } else if (value instanceof List) {
             List<?> list = (List<?>) value;
 
@@ -202,6 +215,9 @@ public class JsonConfigService {
 
     // Método gestiona la persistencia real y la validación
     private void processJsonNode(String attributeName, Object value, Long parentId) {
+
+        log.debug("Procesando nodo '{}', parentId={}", attributeName, parentId);
+        
         Attribute attr = getOrCreateAttribute(attributeName, value);
         if (attr == null)
             return;
@@ -214,6 +230,7 @@ public class JsonConfigService {
         }
 
         if (value instanceof Map) {
+            log.debug("Procesando nodo Map '{}', parentId={}", attributeName, parentId);
             config.setDefaultValue(null);
             Config savedConfig = saveOrGetConfig(config);
 
@@ -222,10 +239,17 @@ public class JsonConfigService {
                 processJsonNode(entry.getKey(), entry.getValue(), savedConfig.getId());
             }
         } else if (value instanceof List) {
+            log.debug("Nodo '{}' detectado como LIST de {} elementos", attributeName, ((List<?>) value).size());
             config.setDefaultValue(null);
             Config savedConfig = saveOrGetConfig(config);
 
             List<?> listValue = (List<?>) value;
+
+            // FULL-REPLACE: borrar todos los hijos anteriores
+            List<Config> existingChildren = configRepository.findByParentIdOrderByIdAsc(savedConfig.getId());
+            if (!existingChildren.isEmpty()) {
+                configRepository.deleteAll(existingChildren);
+            }
             // Si el atributo aún no está marcado como enum, intentar inferir un
             // AttributeType enum
             // a partir del contenido de la lista.
@@ -281,6 +305,7 @@ public class JsonConfigService {
                 }
             }
         } else {
+            log.debug("Nodo '{}' detectado como valor primitivo: {}", attributeName, value);
             String primitiveValue = value != null ? value.toString() : "";
 
             // Si el attribute no está marcado como enum, intentar inferir por contenido
@@ -324,24 +349,60 @@ public class JsonConfigService {
     private Config saveOrGetConfig(Config cfg) {
         Long attributeId = cfg.getAttribute() != null ? cfg.getAttribute().getId() : null;
         Long parentId = cfg.getParent() != null ? cfg.getParent().getId() : null;
-        String defVal = cfg.getDefaultValue();
-        List<Config> candidates = parentId != null ? configRepository.findByParentIdOrderByIdAsc(parentId)
+
+        // Si es un elemento de List y tiene parent => siempre crear nuevo
+        try {
+            boolean cfgIsListAttribute = cfg.getAttribute() != null
+                    && cfg.getAttribute().getAttributeType() != null
+                    && Boolean.TRUE.equals(cfg.getAttribute().getAttributeType().getIsList());
+
+            if (cfgIsListAttribute && parentId != null) {
+                log.debug(
+                        "Guardando nuevo elemento de lista para attributeId={} parentId={} valor='{}'",
+                        attributeId,
+                        parentId,
+                        cfg.getDefaultValue()
+                );
+
+                return configRepository.save(cfg);
+            }
+        } catch (Exception ex) {
+            // por seguridad: si algo falla en comprobación de tipo, caemos al flujo normal
+            log.warn("No se pudo determinar si el atributo es lista; se intentará el flujo normal. Error: {}", ex.getMessage());
+        }
+
+        // Flujo normal, buscar sibling por parent y sobrescribir PRIMITIVO existente si procede
+        List<Config> siblings = parentId != null
+                ? configRepository.findByParentIdOrderByIdAsc(parentId)
                 : configRepository.findByParentIsNull();
 
-        for (Config c : candidates) {
-            Long cAttrId = c.getAttribute() != null ? c.getAttribute().getId() : null;
-            String cDef = c.getDefaultValue();
-            if (attributeId != null && attributeId.equals(cAttrId)) {
-                if ((defVal == null && cDef == null) || (defVal != null && defVal.equals(cDef))) {
-                    return c;
+        for (Config c : siblings) {
+            if (c.getAttribute() != null && c.getAttribute().getId().equals(attributeId)) {
+
+                boolean esLista = c.getAttribute().getAttributeType() != null &&
+                        Boolean.TRUE.equals(c.getAttribute().getAttributeType().getIsList());
+
+                if (!esLista) {
+                    // PRIMITIVO → sobrescribir valor
+                    log.debug("Sobrescribiendo valor del config id={} (attributeId={}) con valor='{}'",
+                            c.getId(), attributeId, cfg.getDefaultValue());
+                    c.setDefaultValue(cfg.getDefaultValue());
+                    return configRepository.save(c);
                 }
+
+                // Si llegamos aquí y isList==true y parent==null, devolvemos el nodo (caso raíz lista)
+                // pero si es lista y parent==null, probablemente sea el "root" que representa la lista; devolverlo para uso por processJsonNode
+                return c;
             }
         }
 
+        // No existe → crear uno nuevo
+        log.debug("Creando nuevo config para attributeId={} parentId={}", attributeId, parentId);
         return configRepository.save(cfg);
     }
 
     private Attribute getOrCreateAttribute(String name, Object value) {
+        log.debug("Obteniendo/creando atributo '{}'", name);
         Optional<Attribute> existing = attributeRepository.findByName(name);
         if (existing.isPresent()) {
             Attribute attr = existing.get();
@@ -456,6 +517,7 @@ public class JsonConfigService {
     }
 
     public String exportToJson() {
+        log.info("Iniciando exportación a JSON...");
         List<Config> rootConfigs = configRepository.findByParentIsNull();
         Map<String, Object> result = new LinkedHashMap<>();
 
@@ -468,6 +530,7 @@ public class JsonConfigService {
         }
 
         try {
+            log.info("Exportación finalizada. Longitud del JSON: {}", result.size());
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
         } catch (Exception e) {
             return "{}";
@@ -478,9 +541,7 @@ public class JsonConfigService {
         List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
         AttributeType attrType = config.getAttribute() != null ? config.getAttribute().getAttributeType() : null;
 
-        // ------------------------------
         // MANEJO DE LISTAS
-        // ------------------------------
         if (attrType != null && Boolean.TRUE.equals(attrType.getIsList())) {
 
             List<Object> list = new java.util.ArrayList<>();
@@ -522,9 +583,7 @@ public class JsonConfigService {
             return list;
         }
 
-        // ------------------------------
         // VALOR PRIMITIVO (NO LISTA)
-        // ------------------------------
         if (children.isEmpty()) {
             String value = config.getDefaultValue();
             if (value == null || value.isEmpty())
@@ -567,6 +626,7 @@ public class JsonConfigService {
         return obj;
     }
 
+    // Método para parsear los nuemros (int y double)
     private Object parseNumeros(String value) {
         if (value == null)
             return null;
