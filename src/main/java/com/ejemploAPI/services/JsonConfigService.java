@@ -2,6 +2,7 @@ package com.ejemploAPI.services;
 
 import com.ejemploAPI.config.exceptions.DuplicateKeyException;
 import com.ejemploAPI.config.exceptions.InvalidEnumValueException;
+import com.ejemploAPI.config.exceptions.InvalidJsonFormatException;
 import com.ejemploAPI.models.Attribute;
 import com.ejemploAPI.models.AttributeType;
 import com.ejemploAPI.models.Config;
@@ -56,8 +57,12 @@ public class JsonConfigService {
             }
 
         } catch (JsonParseException e) {
-            // Esta excepción ocurre EXACTAMENTE cuando hay claves duplicadas
-            throw new DuplicateKeyException("JSON inválido: clave duplicada " + e.getOriginalMessage());
+            String msg = e.getOriginalMessage();
+            if (msg != null && msg.contains("Duplicate field")) {
+                throw new DuplicateKeyException("JSON inválido: clave duplicada " + msg);
+            } else {
+                throw new InvalidJsonFormatException("JSON inválido: error de sintaxis " + msg, e);
+            }
         } catch (Exception e) {
             throw new RuntimeException("Error procesando JSON", e);
         }

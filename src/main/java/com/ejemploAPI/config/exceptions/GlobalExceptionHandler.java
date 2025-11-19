@@ -27,4 +27,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleDuplicateKey(DuplicateKeyException ex) {
         return ResponseEntity.badRequest().body(ex.getMessage());
     }
+
+    @ExceptionHandler(InvalidJsonFormatException.class)
+    public ResponseEntity<String> handleInvalidJson(InvalidJsonFormatException ex) {
+        return ResponseEntity.badRequest().body(ex.getMessage());
+    }
 }
