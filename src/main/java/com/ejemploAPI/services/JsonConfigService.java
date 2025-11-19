@@ -237,9 +237,22 @@ public class JsonConfigService {
         }
 
         if (value instanceof Map) {
-            log.debug("Procesando nodo Map '{}', parentId={}", attributeName, parentId);
+            log.debug("Nodo '{}' detectado como MAP. Borrando hijos existentes si los hay. parentId={}", attributeName, parentId);
+
             config.setDefaultValue(null);
             Config savedConfig = saveOrGetConfig(config);
+
+            // BORRAR hijos anteriores para reemplazo completo
+            List<Config> existingChildren = configRepository.findByParentIdOrderByIdAsc(savedConfig.getId());
+            if (!existingChildren.isEmpty()) {
+                for (Config child : existingChildren) {
+                    log.debug("Eliminando hijo antiguo '{}' (id={}) de '{}'",
+                            child.getAttribute() != null ? child.getAttribute().getName() : "unknown",
+                            child.getId(),
+                            attributeName);
+                }
+                configRepository.deleteAll(existingChildren);
+            }
 
             Map<String, Object> mapValue = (Map<String, Object>) value;
             for (Map.Entry<String, Object> entry : mapValue.entrySet()) {
