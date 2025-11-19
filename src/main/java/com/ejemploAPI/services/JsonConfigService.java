@@ -51,6 +51,7 @@ public class JsonConfigService {
         this.objectMapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
     }
 
+    // Recibe el json como string y lo procesa
     public void importJson(String rawJson) {
         log.info("Important JSON iniciada. Longitud del string recibido: {}", rawJson.length());
 
@@ -81,6 +82,8 @@ public class JsonConfigService {
         }
     }
 
+    // Intenta encontrar un AttributeType enum existente que se ajuste a los valores de la lista
+    // Cuenta cuantos elementos de la lista coinciden con los valores permitidos y devuelve el enum con más coincidencias
     private AttributeType inferEnumTypeForList(String attributeName, List<?> items) {
 
         log.debug("Intentando inferir ENUM para la lista '{}', tamaño {}", attributeName, items.size());
@@ -107,6 +110,7 @@ public class JsonConfigService {
         return bestMatches > 0 ? best : null;
     }
 
+    // Registra que recorre el Json y registra atributos y tipos antes de guardar valores
     private void preScanAndRegisterTypes(Map<String, Object> jsonMap) {
         if (jsonMap == null)
             return;
@@ -115,6 +119,7 @@ public class JsonConfigService {
         }
     }
 
+    // Analiza un nodo y crea su Attribute si no existe
     private void preScanNode(String name, Object value) {
         // Si es un mapa llama recursivamente a sus campos
         if (value instanceof Map) {
@@ -139,6 +144,7 @@ public class JsonConfigService {
         }
     }
 
+    // Asegurar que un Attribute para la lista exista y tenga el tipo correcto
     private void ensureAttributeForList(String name, List<?> listValue) {
         try {
             Optional<Attribute> existing = attributeRepository.findByName(name);
@@ -179,6 +185,7 @@ public class JsonConfigService {
         }
     }
 
+    //Asegurar que un Attribute para un valor primitivo exista y tenga el tipo correcto
     private void ensureAttributeForPrimitive(String name, Object value) {
         try {
             Optional<Attribute> existing = attributeRepository.findByName(name);
@@ -346,6 +353,7 @@ public class JsonConfigService {
         }
     }
 
+    // Guardar nuevos registros de Config o devolver los existentes si ya existe
     private Config saveOrGetConfig(Config cfg) {
         Long attributeId = cfg.getAttribute() != null ? cfg.getAttribute().getId() : null;
         Long parentId = cfg.getParent() != null ? cfg.getParent().getId() : null;
@@ -401,6 +409,7 @@ public class JsonConfigService {
         return configRepository.save(cfg);
     }
 
+    // Obtener un Attribute existente o crearlo si no existe
     private Attribute getOrCreateAttribute(String name, Object value) {
         log.debug("Obteniendo/creando atributo '{}'", name);
         Optional<Attribute> existing = attributeRepository.findByName(name);
@@ -453,6 +462,7 @@ public class JsonConfigService {
         return attributeRepository.save(attr);
     }
 
+    // Determina el tipo de un atributo ( NODO , STRING, NUMERIC, BOOLEAN)
     private AttributeType determineAttributeType(Object value, String attributeName) {
         String typeStr;
         boolean isList = false;
@@ -516,6 +526,7 @@ public class JsonConfigService {
         return attributeTypeRepository.save(type);
     }
 
+    // Método para que los datos en BBDD y generar un JSON
     public String exportToJson() {
         log.info("Iniciando exportación a JSON...");
         List<Config> rootConfigs = configRepository.findByParentIsNull();
@@ -537,6 +548,7 @@ public class JsonConfigService {
         }
     }
 
+    // Recontruye el valor de config como Object
     private Object buildJsonValue(Config config) {
         List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
         AttributeType attrType = config.getAttribute() != null ? config.getAttribute().getAttributeType() : null;
@@ -626,7 +638,7 @@ public class JsonConfigService {
         return obj;
     }
 
-    // Método para parsear los nuemros (int y double)
+    // Método para parsear los numeros (int, Long y Double)
     private Object parseNumeros(String value) {
         if (value == null)
             return null;
