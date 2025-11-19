@@ -545,20 +545,26 @@ public class JsonConfigService {
     public String exportToJson() {
         log.info("Iniciando exportación a JSON...");
         List<Config> rootConfigs = configRepository.findByParentIsNull();
+        log.info("Nodos raíz encontrados: {}", rootConfigs.size());
         Map<String, Object> result = new LinkedHashMap<>();
 
         for (Config config : rootConfigs) {
             if (config.getAttribute() != null) {
                 String attrName = config.getAttribute().getName();
+                log.debug("[ROOT] Exportando nodo raíz '{}'", attrName);
                 Object value = buildJsonValue(config);
                 result.put(attrName, value);
+            } else {
+                log.warn("Nodo raíz sin atributo asociado, id={}", config.getId());
             }
         }
 
         try {
-            log.info("Exportación finalizada. Longitud del JSON: {}", result.size());
+            String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
+            log.info("Exportación finalizada. Longitud del JSON: {} caracteres", json.length());
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
         } catch (Exception e) {
+            log.error("Error generando el JSON" , e);
             return "{}";
         }
     }
