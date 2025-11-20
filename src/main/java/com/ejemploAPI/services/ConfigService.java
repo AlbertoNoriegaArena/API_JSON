@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Transactional
@@ -53,7 +54,14 @@ public class ConfigService {
 
     // Recibe el json como string y lo procesa
     public void importJson(String rawJson) {
-        log.info("Important JSON iniciada. Longitud del string recibido: {}", rawJson.length());
+        AtomicInteger nodosProcesados = new AtomicInteger(0);
+        AtomicInteger nodosCreados = new AtomicInteger(0);
+        AtomicInteger nodosEliminados = new AtomicInteger(0);
+        long startTime = System.currentTimeMillis();
+
+        log.info("Inicio de importación JSON. Longitud del string recibido: {}", rawJson.length());
+        log.debug("Contadores inicializados: procesados={}, creados={}, actualizados={}, eliminados={}",
+                nodosProcesados.get(), nodosCreados.get(), nodosEliminados.get());
 
         try {
             Map<String, Object> jsonMap = objectMapper.readValue(rawJson, Map.class);
@@ -63,10 +71,12 @@ public class ConfigService {
 
             for (Map.Entry<String, Object> entry : jsonMap.entrySet()) {
                 log.debug("Procesando nodo raíz: {}", entry.getKey());
-                processJsonNode(entry.getKey(), entry.getValue(), null);
+                processJsonNode(entry.getKey(), entry.getValue(), null, nodosProcesados, nodosCreados, nodosEliminados);
             }
 
-            log.info("Importación JSON finalizada correctamente.");
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            log.info("Importación JSON finalizada correctamente en {} ms. Nodos procesados={}, creados={},  eliminados={}",
+                    elapsedTime, nodosProcesados.get(), nodosCreados.get(), nodosEliminados.get());
 
         } catch (JsonParseException e) {
             log.error("Error de parseo JSON: {}", e.getOriginalMessage());
@@ -80,6 +90,110 @@ public class ConfigService {
             log.error("Error inesperado importando JSON", e);
             throw new RuntimeException("Error procesando JSON", e);
         }
+    }
+
+    // Intenta encontrar un AttributeType enum existente que se ajuste a los valores de la lista
+    // Cuenta cuantos elementos de la lista coinciden con los valores permitidos y devuelve el enum con más coincidencias
+    private void processJsonNode(String attributeName, Object value, Long parentId,
+                                 AtomicInteger nodosProcesados,
+                                 AtomicInteger nodosCreados,
+                                 AtomicInteger nodosEliminados) {
+
+        nodosProcesados.incrementAndGet();
+        log.debug("Procesando nodo '{}', parentId={}, total nodos procesados={}",
+                attributeName, parentId, nodosProcesados.get());
+
+        Attribute attr = getOrCreateAttribute(attributeName, value);
+        if (attr == null) return;
+
+        Config config = new Config();
+        config.setAttribute(attr);
+        if (parentId != null) {
+            Optional<Config> parent = configRepository.findById(parentId);
+            parent.ifPresent(config::setParent);
+        }
+
+        if (value instanceof Map) {
+            log.debug("Nodo '{}' detectado como MAP. Reemplazo completo. parentId={}", attributeName, parentId);
+            config.setDefaultValue(null);
+            Config savedConfig = saveOrGetConfig(config);
+            nodosCreados.incrementAndGet(); // conteo de creación
+
+            Map<String, Object> mapValue = (Map<String, Object>) value;
+
+            // Borrado recursivo
+            List<Config> existingChildren = configRepository.findByParentIdOrderByIdAsc(savedConfig.getId());
+            if (!existingChildren.isEmpty()) {
+                for (Config child : existingChildren) {
+                    log.debug("Eliminando recursivamente hijo antiguo '{}' (id={}) de '{}'",
+                            child.getAttribute() != null ? child.getAttribute().getName() : "unknown",
+                            child.getId(), attributeName);
+                    deleteConfigRecursively(child, nodosEliminados);
+                }
+            }
+
+            for (Map.Entry<String, Object> entry : mapValue.entrySet()) {
+                log.debug("Insertando nuevo hijo '{}' dentro de '{}'", entry.getKey(), attributeName);
+                processJsonNode(entry.getKey(), entry.getValue(), savedConfig.getId(),
+                        nodosProcesados, nodosCreados, nodosEliminados);
+            }
+
+        } else if (value instanceof List) {
+            log.debug("Nodo '{}' detectado como LIST de {} elementos", attributeName, ((List<?>) value).size());
+            config.setDefaultValue(null);
+            Config savedConfig = saveOrGetConfig(config);
+            nodosCreados.incrementAndGet();
+
+            List<?> listValue = (List<?>) value;
+
+            // FULL-REPLACE: borrar todos los hijos anteriores
+            List<Config> existingChildren = configRepository.findByParentIdOrderByIdAsc(savedConfig.getId());
+            if (!existingChildren.isEmpty()) {
+                for (Config child : existingChildren) {
+                    deleteConfigRecursively(child, nodosEliminados);
+                }
+            }
+
+            for (int i = 0; i < listValue.size(); i++) {
+                Object item = listValue.get(i);
+                if (item instanceof Map) {
+                    processJsonNode(attributeName + "_item_" + i, item, savedConfig.getId(),
+                            nodosProcesados, nodosCreados, nodosEliminados);
+                } else {
+                    String itemValue = item != null ? item.toString() : "";
+                    Config itemConfig = new Config();
+                    itemConfig.setAttribute(attr);
+                    itemConfig.setParent(savedConfig);
+                    itemConfig.setDefaultValue(itemValue);
+
+                    saveOrGetConfig(itemConfig);
+                    nodosCreados.incrementAndGet();
+                }
+            }
+
+        } else {
+            log.debug("Nodo '{}' detectado como valor primitivo: {}", attributeName, value);
+            String primitiveValue = value != null ? value.toString() : "";
+
+            config.setDefaultValue(primitiveValue);
+            Config savedConfig = saveOrGetConfig(config);
+            nodosCreados.incrementAndGet();
+        }
+    }
+
+    // versión modificada de borrado recursivo que cuenta eliminados
+    private void deleteConfigRecursively(Config config, AtomicInteger nodosEliminados) {
+        List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
+
+        for (Config child : children) {
+            deleteConfigRecursively(child, nodosEliminados);
+        }
+
+        log.debug("Borrando nodo config id={} (attribute={})",
+                config.getId(),
+                config.getAttribute() != null ? config.getAttribute().getName() : "null");
+        configRepository.delete(config);
+        nodosEliminados.incrementAndGet();
     }
 
     // Intenta encontrar un AttributeType enum existente que se ajuste a los valores de la lista
@@ -547,12 +661,13 @@ public class ConfigService {
         List<Config> rootConfigs = configRepository.findByParentIsNull();
         log.info("Nodos raíz encontrados: {}", rootConfigs.size());
         Map<String, Object> result = new LinkedHashMap<>();
+        AtomicInteger totalNodesExported = new AtomicInteger(0);
 
         for (Config config : rootConfigs) {
             if (config.getAttribute() != null) {
                 String attrName = config.getAttribute().getName();
                 log.debug("[ROOT] Exportando nodo raíz '{}'", attrName);
-                Object value = buildJsonValue(config);
+                Object value = buildJsonValue(config, totalNodesExported);
                 result.put(attrName, value);
             } else {
                 log.warn("Nodo raíz sin atributo asociado, id={}", config.getId());
@@ -561,8 +676,9 @@ public class ConfigService {
 
         try {
             String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
-            log.info("Exportación finalizada. Longitud del JSON: {} caracteres", json.length());
-            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
+            log.info("Exportación finalizada. Nodos exportados: {}. Longitud del JSON: {} caracteres",
+                    totalNodesExported.get(), json.length());
+            return json;
         } catch (Exception e) {
             log.error("Error generando el JSON" , e);
             return "{}";
@@ -570,7 +686,8 @@ public class ConfigService {
     }
 
     // Recontruye el valor de config como Object
-    private Object buildJsonValue(Config config) {
+    private Object buildJsonValue(Config config, AtomicInteger totalNodesExported) {
+        totalNodesExported.incrementAndGet();
         List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
         AttributeType attrType = config.getAttribute() != null ? config.getAttribute().getAttributeType() : null;
 
@@ -584,6 +701,9 @@ public class ConfigService {
                 if (childValue == null || childValue.isEmpty())
                     continue;
 
+                log.debug("Exportando elemento de lista '{}' con valor='{}'",
+                        child.getAttribute() != null ? child.getAttribute().getName() : "unknown",
+                        childValue);
                 // ENUM LIST
                 if (Boolean.TRUE.equals(attrType.getIsEnum())) {
 
@@ -652,8 +772,10 @@ public class ConfigService {
                 String childAttrName = child.getAttribute().getName();
                 if (childAttrName.contains("_item_"))
                     childAttrName = childAttrName.substring(0, childAttrName.lastIndexOf("_item_"));
-                Object childValue = buildJsonValue(child);
+                Object childValue = buildJsonValue(child, totalNodesExported);
                 obj.put(childAttrName, childValue);
+            } else {
+                log.warn("Nodo hijo sin atributo, id={}", child.getId());
             }
         }
         return obj;
