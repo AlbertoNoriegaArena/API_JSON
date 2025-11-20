@@ -1,37 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
-    <!-- Carpeta de logs -->
     <property name="LOG_PATH" value="logs" />
-
-    <!-- Formato de log -->
     <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n" />
 
-    <!-- Log en consola -->
+    <!-- Consola -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
         </encoder>
     </appender>
 
-    <!-- Log en archivo -->
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <!-- Archivo con rotación -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/app.log</file>
-        <append>true</append>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/app.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
         <encoder>
             <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
         </encoder>
     </appender>
 
-    <!-- Logs de Spring/Hibernate solo WARN -->
-    <logger name="org.springframework" level="WARN"/>
-    <logger name="org.hibernate" level="WARN"/>
+    <!-- Reducir ruido de frameworks -->
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="org.hibernate" level="INFO"/>
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+    <logger name="com.zaxxer.hikari.pool" level="INFO"/>
 
-    <!-- Tus logs en DEBUG -->
-    <logger name="com.ejemploAPI.services" level="DEBUG"/>
+    <!-- Tus logs personalizados en DEBUG -->
+    <logger name="com.ejemploAPI" level="DEBUG"/>
 
-    <!-- Nivel global -->
-    <root level="DEBUG">
+    <!-- Nivel global más limpio -->
+    <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </root>
