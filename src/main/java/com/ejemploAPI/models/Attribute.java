@@ -7,6 +7,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 
+import java.util.Objects;
+
 @Entity
 public class Attribute {
 
@@ -28,5 +30,26 @@ public class Attribute {
 
     public AttributeType getAttributeType() { return attributeType; }
     public void setAttributeType(AttributeType attributeType) { this.attributeType = attributeType; }
+
+    @Override
+    public String toString() {
+        return "Attribute{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", attributeType=" + attributeType +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Attribute attribute = (Attribute) o;
+        return Objects.equals(id, attribute.id) && Objects.equals(name, attribute.name) && Objects.equals(attributeType, attribute.attributeType);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, name, attributeType);
+    }
 }
 

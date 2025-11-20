@@ -8,6 +8,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
+import java.util.Objects;
+
 @Entity
 @Table(name = "config")
 public class Config {
@@ -85,5 +87,30 @@ public class Config {
 
     public void setIsCustom(Boolean custom) {
         isCustom = custom;
+    }
+
+    @Override
+    public String toString() {
+        return "Config{" +
+                "id=" + id +
+                ", defaultValue='" + defaultValue + '\'' +
+                ", descripcion='" + descripcion + '\'' +
+                ", attribute=" + attribute +
+                ", parent=" + parent +
+                ", applicationNode='" + applicationNode + '\'' +
+                ", isCustom=" + isCustom +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Config config = (Config) o;
+        return Objects.equals(id, config.id) && Objects.equals(defaultValue, config.defaultValue) && Objects.equals(descripcion, config.descripcion) && Objects.equals(attribute, config.attribute) && Objects.equals(parent, config.parent) && Objects.equals(applicationNode, config.applicationNode) && Objects.equals(isCustom, config.isCustom);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, defaultValue, descripcion, attribute, parent, applicationNode, isCustom);
     }
 }
