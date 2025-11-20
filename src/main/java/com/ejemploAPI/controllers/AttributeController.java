@@ -1,5 +1,7 @@
 package com.ejemploAPI.controllers;
 
+import com.ejemploAPI.dtos.AttributeDTO;
+import com.ejemploAPI.mappers.AttributeMapper;
 import com.ejemploAPI.models.Attribute;
 import com.ejemploAPI.models.AttributeType;
 import com.ejemploAPI.repositories.AttributeRepository;
@@ -29,21 +31,24 @@ public class AttributeController {
     }
 
     @GetMapping
-    public List<Attribute> list() {
+    public List<AttributeDTO> list() {
         log.info("Solicitud recibida: listar todos los atributos");
-        List<Attribute> list = attributeRepository.findAll();
+        List<AttributeDTO> list = attributeRepository.findAll().stream()
+                .map(AttributeMapper::toDTO)
+                .toList();
         log.info("Cantidad de atributos encontrados: {}", list.size());
         return list;
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Attribute> get(@PathVariable Long id) {
+    public ResponseEntity<AttributeDTO> get(@PathVariable Long id) {
         log.info("Solicitud recibida: obtener atributo con ID {}", id);
 
         return attributeRepository.findById(id)
-                .map(attribute -> {
-                    log.info("Atributo encontrado: ID {}", attribute.getId());
-                    return ResponseEntity.ok(attribute);
+                .map(AttributeMapper::toDTO)
+                .map(dto -> {
+                    log.info("Atributo encontrado: ID {}", id);
+                    return ResponseEntity.ok(dto);
                 })
                 .orElseGet(() -> {
                     log.warn("Atributo no encontrado con ID {}", id);
@@ -52,65 +57,57 @@ public class AttributeController {
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody Attribute payload) {
-        log.info("Solicitud recibida: crear atributo con nombre '{}'", payload.getName());
+    public ResponseEntity<?> create(@RequestBody AttributeDTO dto) {
+        log.info("Solicitud recibida: crear atributo con nombre '{}'", dto.getName());
 
-        // Validar si ya existe
-        if (payload.getName() != null && attributeRepository.findByName(payload.getName()).isPresent()) {
-            log.warn("Conflicto: ya existe un atributo con el nombre '{}'", payload.getName());
+        if (dto.getName() != null && attributeRepository.findByName(dto.getName()).isPresent()) {
+            log.warn("Conflicto: ya existe un atributo con el nombre '{}'", dto.getName());
             return ResponseEntity.status(409)
-                    .body("Ya existe un atributo con el nombre '" + payload.getName() + "'.");
+                    .body("Ya existe un atributo con el nombre '" + dto.getName() + "'.");
         }
 
-        // Procesar AttributeType si viene en el payload
-        if (payload.getAttributeType() != null && payload.getAttributeType().getId() != null) {
-            Long typeId = payload.getAttributeType().getId();
-            log.info("Validando existencia de AttributeType con ID {}", typeId);
-
-            Optional<AttributeType> at = attributeTypeRepository.findById(typeId);
-            if (at.isEmpty()) {
-                log.warn("No existe AttributeType con ID {}", typeId);
-                return ResponseEntity.badRequest()
-                        .body("El AttributeType con id " + typeId + " no existe.");
+        AttributeType type = null;
+        if (dto.getAttributeTypeId() != null) {
+            log.info("Validando existencia de AttributeType con ID {}", dto.getAttributeTypeId());
+            type = attributeTypeRepository.findById(dto.getAttributeTypeId()).orElse(null);
+            if (type == null) {
+                log.warn("No existe AttributeType con ID {}", dto.getAttributeTypeId());
+                return ResponseEntity.badRequest().body("El AttributeType con id " + dto.getAttributeTypeId() + " no existe.");
             }
-            payload.setAttributeType(at.get());
         }
 
-        Attribute saved = attributeRepository.save(payload);
+        Attribute saved = attributeRepository.save(AttributeMapper.toEntity(dto, type));
         log.info("Atributo creado correctamente con ID {}", saved.getId());
 
-        return ResponseEntity.status(201).body(saved);
+        return ResponseEntity.status(201).body(AttributeMapper.toDTO(saved));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Attribute> update(@PathVariable Long id, @RequestBody Attribute payload) {
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody AttributeDTO dto) {
         log.info("Solicitud recibida: actualizar atributo con ID {}", id);
 
         Optional<Attribute> maybe = attributeRepository.findById(id);
-
         if (maybe.isEmpty()) {
             log.warn("No se encontró atributo para actualizar. ID {}", id);
             return ResponseEntity.notFound().build();
         }
 
         Attribute a = maybe.get();
-        a.setName(payload.getName());
-        log.info("Actualizando nombre del atributo ID {} a '{}'", id, payload.getName());
 
-        if (payload.getAttributeType() != null && payload.getAttributeType().getId() != null) {
-            Long typeId = payload.getAttributeType().getId();
-            log.info("Validando AttributeType para actualización. ID {}", typeId);
-
-            attributeTypeRepository.findById(typeId).ifPresentOrElse(
-                    a::setAttributeType,
-                    () -> log.warn("No existe AttributeType con ID {}. No se actualiza este campo.", typeId)
-            );
+        AttributeType type = null;
+        if (dto.getAttributeTypeId() != null) {
+            log.info("Validando AttributeType para actualización. ID {}", dto.getAttributeTypeId());
+            type = attributeTypeRepository.findById(dto.getAttributeTypeId()).orElse(null);
+            if (type == null) {
+                log.warn("No existe AttributeType con ID {}. No se actualiza este campo.", dto.getAttributeTypeId());
+            }
         }
 
+        AttributeMapper.updateEntity(a, dto, type);
         attributeRepository.save(a);
         log.info("Atributo actualizado correctamente. ID {}", id);
 
-        return ResponseEntity.ok(a);
+        return ResponseEntity.ok(AttributeMapper.toDTO(a));
     }
 
     @DeleteMapping("/{id}")
@@ -126,19 +123,14 @@ public class AttributeController {
         try {
             attributeRepository.deleteById(id);
             log.info("Atributo eliminado correctamente. ID {}", id);
-
             return ResponseEntity.status(HttpStatus.NO_CONTENT)
                     .body("Elemento borrado correctamente");
-
         } catch (DataIntegrityViolationException e) {
             log.error("Error de integridad al eliminar atributo ID {}: {}", id, e.getMessage());
-
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body("No se puede borrar el elemento porque tiene elementos asociados");
-
         } catch (Exception e) {
             log.error("Error inesperado al eliminar atributo ID {}: {}", id, e.getMessage());
-
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al intentar borrar el elemento");
         }

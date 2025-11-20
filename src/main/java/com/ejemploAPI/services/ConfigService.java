@@ -52,6 +52,11 @@ public class ConfigService {
         this.objectMapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
     }
 
+    // Método para buscar un Config por su ID
+    public Optional<Config> findById(Long id) {
+        return configRepository.findById(id);
+    }
+
     // Recibe el json como string y lo procesa
     public void importJson(String rawJson) {
         AtomicInteger nodosProcesados = new AtomicInteger(0);
