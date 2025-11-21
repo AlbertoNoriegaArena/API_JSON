@@ -34,6 +34,11 @@ public class StartupDataLoader implements CommandLineRunner {
             List<String> colores = Arrays.asList("ROJO", "AZUL", "AMARILLO", "VERDE");
             attributeTypeService.addValuesToAttributeType(color, colores);
 
+            // Precargar "mes" enum con el nombre de los meses
+            AttributeType mes = attributeTypeService.ensureEnumType("mes");
+            List<String> meses = Arrays.asList("ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE");
+            attributeTypeService.addValuesToAttributeType(mes, meses);
+
             log.info("StartupDataLoader: enums precargados: 'día' y 'color'");
         } catch (Exception ex) {
             log.error("Error precargando enums en arranque", ex);
