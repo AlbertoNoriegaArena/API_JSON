@@ -1,9 +1,11 @@
 package com.ejemploAPI.controllers;
 
+import com.ejemploAPI.config.exceptions.InvalidEnumValueException;
 import com.ejemploAPI.dtos.ConfigDTO;
 import com.ejemploAPI.mappers.ConfigMapper;
 import com.ejemploAPI.models.Config;
 import com.ejemploAPI.services.ConfigService;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,14 +28,27 @@ public class ConfigController {
     @PostMapping("/import")
     public ResponseEntity<String> importJson(@RequestBody Map<String, Object> dataMap) {
         try {
-            // Convertimos el Map recibido directamente a un String JSON para el servicio
             String json = objectMapper.writeValueAsString(dataMap);
             configService.importJson(json);
             return ResponseEntity.ok("Json importado correctamente");
+        } catch (InvalidEnumValueException e) {
+            // Retornamos la info de la excepción personalizada
+            return ResponseEntity
+                    .badRequest()
+                    .body("Error al procesar json: " + e.getMessage() +
+                            ". Valores permitidos: " + String.join(", ", (Iterable<String>) e.getAllowedValues()));
+        } catch (JsonParseException e) {
+            String msg = e.getOriginalMessage();
+            if (msg != null && msg.contains("Duplicate field")) {
+                return ResponseEntity.badRequest().body("JSON inválido: clave duplicada " + msg);
+            } else {
+                return ResponseEntity.badRequest().body("JSON inválido: error de sintaxis " + msg);
+            }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error al procesar json: " + e.getMessage());
         }
     }
+
 
     // GET BY ID: usamos el DTO para exponer los datos de forma segura
     @GetMapping("/{id}")
