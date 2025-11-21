@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/attribute-type-values")
+@RequestMapping("/api/attribute-type-values")
 public class AttributeTypeValueController {
 
     private static final Logger log = LoggerFactory.getLogger(AttributeTypeValueController.class);

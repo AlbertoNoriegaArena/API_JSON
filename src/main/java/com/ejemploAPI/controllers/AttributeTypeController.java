@@ -4,6 +4,7 @@ import com.ejemploAPI.dtos.AttributeTypeDTO;
 import com.ejemploAPI.mappers.AttributeTypeMapper;
 import com.ejemploAPI.models.AttributeType;
 import com.ejemploAPI.repositories.AttributeTypeRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -16,7 +17,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/attribute-types")
+@RequestMapping("/api/attribute-types")
 public class AttributeTypeController {
 
     private static final Logger log = LoggerFactory.getLogger(AttributeTypeController.class);
@@ -28,6 +29,7 @@ public class AttributeTypeController {
     }
 
     @GetMapping
+    @Operation(summary = "Listar todos los tipos de atributos")
     public List<AttributeTypeDTO> list() {
         log.info("Solicitud recibida: listar todos los AttributeType");
         List<AttributeType> list = attributeTypeRepository.findAll();
@@ -36,6 +38,7 @@ public class AttributeTypeController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Listar un tipo de atributo por id")
     public ResponseEntity<AttributeTypeDTO> getById(@PathVariable Long id) {
         log.info("Solicitud para obtener AttributeType por ID: {}", id);
         return attributeTypeRepository.findById(id)
@@ -50,6 +53,7 @@ public class AttributeTypeController {
     }
 
     @PostMapping
+    @Operation(summary = "Crear un nuevo tipo de atributo")
     public ResponseEntity<AttributeTypeDTO> create(@RequestBody AttributeTypeDTO dto) {
         log.info("Solicitud para crear AttributeType: {}", dto);
         AttributeType entity = AttributeTypeMapper.toEntity(dto);
@@ -59,6 +63,7 @@ public class AttributeTypeController {
         return ResponseEntity.status(HttpStatus.CREATED).body(AttributeTypeMapper.toDTO(saved));
     }
 
+    @Operation(summary = "Editar un tipo de atributo")
     @PutMapping("/{id}")
     public ResponseEntity<AttributeTypeDTO> update(@PathVariable Long id, @RequestBody AttributeTypeDTO dto) {
         log.info("Solicitud para actualizar AttributeType con ID: {}", id);
@@ -79,7 +84,9 @@ public class AttributeTypeController {
         return ResponseEntity.ok(AttributeTypeMapper.toDTO(updated));
     }
 
+
     @DeleteMapping("/{id}")
+    @Operation(summary = "Borrar un tipo de atributo")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         log.info("Solicitud para eliminar AttributeType con ID: {}", id);
 
