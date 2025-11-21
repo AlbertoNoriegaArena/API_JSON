@@ -10,7 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Optional;
 import java.util.Map;
 
 @RestController
@@ -49,20 +48,16 @@ public class ConfigController {
         }
     }
 
-
     // GET BY ID: usamos el DTO para exponer los datos de forma segura
     @GetMapping("/{id}")
-    public ResponseEntity<ConfigDTO> getById(@PathVariable Long id) {
-        // Buscamos la entidad del modelo en la base de datos
-        Optional<Config> configOptional = configService.findById(id);
-
-        // Si existe, la mapeamos a un DTO para la respuesta
-        return configOptional
-                .map(config -> {
-                    ConfigDTO dto = ConfigMapper.toDTO(config);
-                    return ResponseEntity.ok(dto);
-                })
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<?> getById(@PathVariable Long id) {
+        try {
+            Config config = configService.findById(id);
+            ConfigDTO dto = ConfigMapper.toDTO(config);
+            return ResponseEntity.ok(dto);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body("No se encontró registro con id: " + id);
+        }
     }
 
     @GetMapping("/export")

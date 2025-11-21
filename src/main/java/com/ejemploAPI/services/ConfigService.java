@@ -40,12 +40,20 @@ public class ConfigService {
         this.attributeTypeRepository = attributeTypeRepository;
         this.attributeTypeService = attributeTypeService;
         this.objectMapper = new ObjectMapper();
+        // Detecta claves duplicadas en el JSON y lanza excepción si las hay
         this.objectMapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
     }
 
-    public Optional<Config> findById(Long id) {
-        return configRepository.findById(id);
+    // Devolver Config por su id
+    public Config findById(Long id) {
+        log.info("Buscando Config con id = {}", id);
+        return configRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("No se encontró Config con id = {}", id);
+                    return new RuntimeException("No se encontró Config con id = " + id);
+                });
     }
+
 
     public void importJson(String rawJson) {
         AtomicInteger nodosProcesados = new AtomicInteger(0);
@@ -56,8 +64,10 @@ public class ConfigService {
         log.info("Inicio de importación JSON. Longitud del string recibido: {}", rawJson.length());
         try {
             Map<String, Object> jsonMap = objectMapper.readValue(rawJson, Map.class);
+            // Detectar si cada nodo necesita un AttributeType
             preScanAndRegisterTypes(jsonMap);
 
+            // Procesar cada nodo recursivamente
             for (Map.Entry<String, Object> entry : jsonMap.entrySet()) {
                 processJsonNode(entry.getKey(), entry.getValue(), null, nodosProcesados, nodosCreados, nodosEliminados, 0);
             }
@@ -78,7 +88,10 @@ public class ConfigService {
         }
     }
 
-    // Métodos para inferir enums
+    /* Métodos para inferir enums
+    Busca si un valor o lista coincide con algún AttributeType marcado como enum
+    Esto permite que si tu JSON tiene "color": "ROJO", se asocie automáticamente al AttributeType Color si existe
+    */
     private AttributeType findEnumTypeMatchingValue(String value) {
         if (value == null) return null;
         List<AttributeType> enumTypes = attributeTypeRepository.findByIsEnum(true);
@@ -111,7 +124,10 @@ public class ConfigService {
         return null;
     }
 
-    // Métodos del pre Scan
+    /*  Métodos del pre Scan
+        Recorre todo el JSON antes de persistir, y asegura que cada atributo tenga un AttributeType
+    */
+
     private void preScanAndRegisterTypes(Map<String, Object> jsonMap) {
         if (jsonMap == null) return;
         for (Map.Entry<String, Object> entry : jsonMap.entrySet()) {
@@ -134,6 +150,7 @@ public class ConfigService {
         }
     }
 
+    // Registra los atributos en base de datos si no existen.
     private void ensureAttributeForList(String name, List<?> listValue) {
         Optional<Attribute> existing = attributeRepository.findByName(name);
         if (existing.isPresent()) {
@@ -187,7 +204,11 @@ public class ConfigService {
         attributeRepository.save(attr);
     }
 
-    // Determina el tipo del atributo
+    /* Determina el tipo del atributo
+       NUMERIC, BOOLEAN, STRING, NODE (otro objeto JSON)
+       Si es lista (isList) o enum (isEnum)
+       Si no existe, lo crea en la base de datos
+     */
     private AttributeType determineAttributeType(Object value, String attributeName) {
         boolean isList = value instanceof List;
         boolean isEnum = false;
@@ -228,7 +249,13 @@ public class ConfigService {
         return attributeTypeRepository.save(type);
     }
 
-    // método para procesar los nodos
+    /*  Aquí es donde realmente se construye la jerarquía Config en la BBDD
+        Dependiendo del tipo de nodo:
+        Map => nodo padre => se crean hijos recursivamente
+        List => nodo tipo lista => se crean Config para cada ítem
+        Primitivo → valor simple => se guarda en defaultValue
+        Además maneja: inferencia de enums para listas y eliminación recursiva de hijos antiguos antes de crear nuevos
+     */
     private void processJsonNode(String attributeName, Object value, Long parentId,
                                  AtomicInteger nodosProcesados,
                                  AtomicInteger nodosCreados,
@@ -344,9 +371,9 @@ public class ConfigService {
         }
     }
 
-
-
-    // Método para Guardar o coger las configs
+    /* Si la config ya existe para ese atributo y padre, la actualiza. Si no existe, la guarda
+       Maneja listas y nodos padre-hijo
+     */
     private Config saveOrGetConfig(Config cfg) {
         Long attributeId = cfg.getAttribute() != null ? cfg.getAttribute().getId() : null;
         Long parentId = cfg.getParent() != null ? cfg.getParent().getId() : null;
@@ -381,7 +408,7 @@ public class ConfigService {
         return configRepository.save(cfg);
     }
 
-    // Método para crear o coger atributos
+    // Busca un atributo por nombre o lo crea con su AttributeType
     private Attribute getOrCreateAttribute(String name, Object value) {
         Optional<Attribute> existing = attributeRepository.findByName(name);
         if (existing.isPresent()) return existing.get();
@@ -393,7 +420,7 @@ public class ConfigService {
         return attributeRepository.save(attr);
     }
 
-    // borrado recursivo
+    // Borra un nodo y todos sus hijos de la BBDD
     private void deleteConfigRecursively(Config config, AtomicInteger nodosEliminados) {
         List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
         for (Config child : children) {
@@ -433,7 +460,10 @@ public class ConfigService {
         return maxMatches > 0 ? bestMatch : null;
     }
 
-    // Exportación completa a JSON
+    /* Exportación completa a JSON
+       Recorre todos los Config raíz (parent = null) y reconstruye un objeto JSON
+       Llama recursivamente a buildJsonValue
+    */
     public String exportToJson() {
         log.info("Iniciando exportación a JSON...");
         List<Config> rootConfigs = configRepository.findByParentIsNull();
@@ -463,7 +493,10 @@ public class ConfigService {
         }
     }
 
-    // Reconstruye un Config a objeto JSON
+    /* Maneja listas, enums, tipos primitivos y nodos hijos
+       Convierte los valores de string a Boolean, Numeric o enum según corresponda
+       Agrupa los items de lista usando el sufijo _item_
+     */
     private Object buildJsonValue(Config config, AtomicInteger totalNodesExported) {
         totalNodesExported.incrementAndGet();
         List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
