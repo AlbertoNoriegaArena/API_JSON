@@ -46,7 +46,7 @@ public class ConfigService {
 
     // Devolver Config por su id
     public Config findById(Long id) {
-        log.info("Buscando Config con id = {}", id);
+        log.debug("Buscando Config con id = {}", id);
         return configRepository.findById(id)
                 .orElseThrow(() -> {
                     log.error("No se encontró Config con id = {}", id);
@@ -61,7 +61,7 @@ public class ConfigService {
         AtomicInteger nodosEliminados = new AtomicInteger(0);
         long startTime = System.currentTimeMillis();
 
-        log.info("Inicio de importación JSON. Longitud del string recibido: {}", rawJson.length());
+        log.debug("Inicio de importación JSON. Longitud del string recibido: {}", rawJson.length());
         try {
             Map<String, Object> jsonMap = objectMapper.readValue(rawJson, Map.class);
             // Detectar si cada nodo necesita un AttributeType
@@ -73,7 +73,7 @@ public class ConfigService {
             }
 
             long elapsedTime = System.currentTimeMillis() - startTime;
-            log.info("Importación JSON finalizada en {} ms. Procesados={}, Creados={}, Eliminados={}",
+            log.debug("Importación JSON finalizada en {} ms. Procesados={}, Creados={}, Eliminados={}",
                     elapsedTime, nodosProcesados.get(), nodosCreados.get(), nodosEliminados.get());
 
         } catch (JsonParseException e) {
@@ -271,13 +271,13 @@ public class ConfigService {
         String indent = "  ".repeat(level); // indentación para logs
 
         if (parentId != null) {
-            log.info("{}[PADRE] Procesando nodo '{}'{}", indent, attributeName, parentId != null ? " con parentId=" + parentId : "");
+            log.debug("{}[PADRE] Procesando nodo '{}'{}", indent, attributeName, parentId != null ? " con parentId=" + parentId : "");
             configRepository.findById(parentId).ifPresent(config::setParent);
-            log.info("[HIJO] Procesando nodo '{}' con parentId={}", attributeName, parentId);
+            log.debug("[HIJO] Procesando nodo '{}' con parentId={}", attributeName, parentId);
         }
 
         if (value instanceof Map) {
-            log.info("{}[PADRE] Procesando nodo '{}'{}", indent, attributeName,
+            log.debug("{}[PADRE] Procesando nodo '{}'{}", indent, attributeName,
                     parentId != null ? " con parentId=" + parentId : " (raíz)");
             // Nodo tipo MAP
             config.setDefaultValue(null);
@@ -325,7 +325,7 @@ public class ConfigService {
                             nodosProcesados, nodosCreados, nodosEliminados, level);
                 } else {
                     String itemValue = item != null ? item.toString() : "";
-                    log.info("{}[PRIMITIVO] Nodo '{}' = '{}'", indent, attributeName, value);
+                    log.debug("{}[LISTA] {}[{}] = '{}'", indent, attributeName, i, itemValue);
                     Config itemConfig = new Config();
                     itemConfig.setAttribute(attr);
                     itemConfig.setParent(savedConfig);
@@ -355,7 +355,7 @@ public class ConfigService {
         } else {
             // Nodo tipo primitivo
             String primitiveValue = value != null ? value.toString() : "";
-            log.info("[PRIMITIVO] Nodo '{}' = '{}'", attributeName, primitiveValue);
+            log.debug("[PRIMITIVO] Nodo '{}' = '{}'", attributeName, primitiveValue);
 
             // Intentar asociar a enum si existe
             AttributeType match = findEnumTypeMatchingValue(primitiveValue);
@@ -465,9 +465,9 @@ public class ConfigService {
        Llama recursivamente a buildJsonValue
     */
     public String exportToJson() {
-        log.info("Iniciando exportación a JSON...");
+        log.debug("Iniciando exportación a JSON...");
         List<Config> rootConfigs = configRepository.findByParentIsNull();
-        log.info("Nodos raíz encontrados: {}", rootConfigs.size());
+        log.debug("Nodos raíz encontrados: {}", rootConfigs.size());
         Map<String, Object> result = new LinkedHashMap<>();
         AtomicInteger totalNodesExported = new AtomicInteger(0);
 
@@ -484,7 +484,7 @@ public class ConfigService {
 
         try {
             String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
-            log.info("Exportación finalizada. Nodos exportados: {}. Longitud del JSON: {} caracteres",
+            log.debug("Exportación finalizada. Nodos exportados: {}. Longitud del JSON: {} caracteres",
                     totalNodesExported.get(), json.length());
             return json;
         } catch (Exception e) {
@@ -499,13 +499,23 @@ public class ConfigService {
      */
     private Object buildJsonValue(Config config, AtomicInteger totalNodesExported) {
         totalNodesExported.incrementAndGet();
+        String attrName = config.getAttribute() != null ? config.getAttribute().getName() : "(sin atributo)";
+        Long id = config.getId();
         List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
         AttributeType attrType = config.getAttribute() != null ? config.getAttribute().getAttributeType() : null;
 
         // Manejo de listas
         if (attrType != null && Boolean.TRUE.equals(attrType.getIsList())) {
+            log.debug("[EXPORT-LIST] '{}' (id={}) contiene {} elementos",
+                    attrName, id, children.size());
             List<Object> list = new ArrayList<>();
             for (Config child : children) {
+
+                log.debug("[EXPORT-LIST]   -> Item hijo '{}' (id={}) valor='{}'",
+                        child.getAttribute() != null ? child.getAttribute().getName() : "(sin atributo)",
+                        child.getId(),
+                        child.getDefaultValue()
+                );
                 String childValue = child.getDefaultValue();
                 if (childValue == null) continue;
 
@@ -537,6 +547,7 @@ public class ConfigService {
 
         // Valor primitivo
         if (children.isEmpty()) {
+            log.debug("[EXPORT-PRIMITIVE] '{}' (id={}) = '{}'", attrName, id, config.getDefaultValue());
             String value = config.getDefaultValue();
             if (value == null) return null;
 
