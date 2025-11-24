@@ -16,9 +16,9 @@ import java.util.Optional;
 @Service
 public class AttributeTypeService {
 
-    private AttributeTypeRepository attributeTypeRepository;
+    private final AttributeTypeRepository attributeTypeRepository;
 
-    private AttributeTypeValueRepository attributeTypeValueRepository;
+    private final AttributeTypeValueRepository attributeTypeValueRepository;
 
     public AttributeTypeService(AttributeTypeRepository attributeTypeRepository, AttributeTypeValueRepository attributeTypeValueRepository) {
         this.attributeTypeRepository = attributeTypeRepository;
@@ -53,18 +53,6 @@ public class AttributeTypeService {
                 attributeTypeValueRepository.save(atv);
             }
         }
-    }
-
-    public boolean isValueAllowed(AttributeType attributeType, String value) {
-        if (attributeType == null)
-            return true;
-        if (!Boolean.TRUE.equals(attributeType.getIsEnum()))
-            return true;
-        if (value == null)
-            return false;
-        return attributeTypeValueRepository
-                .findFirstByAttributeTypeIdAndValue(attributeType.getId(), value)
-                .isPresent();
     }
 
     public List<String> getAllowedValues(AttributeType attributeType) {

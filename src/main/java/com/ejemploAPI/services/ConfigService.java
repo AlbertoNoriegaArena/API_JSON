@@ -14,7 +14,7 @@ import com.ejemploAPI.repositories.ConfigRepository;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,7 +137,9 @@ public class ConfigService {
 
         log.debug("Inicio de importación JSON. Longitud del string recibido: {}", rawJson.length());
         try {
-            Map<String, Object> jsonMap = objectMapper.readValue(rawJson, Map.class);
+            // Usar JsonNode para detectar duplicados
+            JsonNode rootNode = objectMapper.readTree(rawJson); // objectMapper con STRICT_DUPLICATE_DETECTION
+            Map<String, Object> jsonMap = objectMapper.convertValue(rootNode, Map.class);
             // Detectar si cada nodo necesita un AttributeType
             preScanAndRegisterTypes(jsonMap);
 

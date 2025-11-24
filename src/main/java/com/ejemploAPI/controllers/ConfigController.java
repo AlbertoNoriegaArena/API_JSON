@@ -1,17 +1,12 @@
 package com.ejemploAPI.controllers;
 
+import com.ejemploAPI.config.exceptions.DuplicateKeyException;
 import com.ejemploAPI.config.exceptions.InvalidEnumValueException;
 import com.ejemploAPI.dtos.ConfigDTO;
-import com.ejemploAPI.mappers.ConfigMapper;
-import com.ejemploAPI.models.Attribute;
-import com.ejemploAPI.models.Config;
-import com.ejemploAPI.repositories.AttributeRepository;
 import com.ejemploAPI.services.ConfigService;
-import com.ejemploAPI.repositories.ConfigRepository;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,30 +14,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/config")
 public class ConfigController {
 
     private final ConfigService configService;
-    private final ConfigRepository configRepository;
-    private final AttributeRepository attributeRepository;
-    private final ObjectMapper objectMapper;
+
     private static final Logger log = LoggerFactory.getLogger(ConfigController.class);
 
-    public ConfigController(ConfigService configService, ConfigRepository configRepository, AttributeRepository attributeRepository) {
+    public ConfigController(ConfigService configService) {
         this.configService = configService;
-        this.configRepository = configRepository;
-        this.attributeRepository = attributeRepository;
-        this.objectMapper = new ObjectMapper();
-
     }
 
     @GetMapping
     public List<ConfigDTO> list() {
-        log.info("Solicitud recibida: listar todos los Config");
+        log.info("Listando todos los Config");
         return configService.findAll();
     }
 
@@ -107,26 +94,20 @@ public class ConfigController {
             "   \"meses\" : [\"enero\" , \"abril\"]\n" +
             "   \n" +
             "}")
-    public ResponseEntity<String> importJson(@RequestBody Map<String, Object> dataMap) {
+    public ResponseEntity<String> importJson(@RequestBody byte[] rawJsonBytes) {
+        //Pasamos un array de bytes en lugar de una Map para evitar que Spring parsee el Json y así lograr que lance Exception por clave duplicada
         try {
-            String json = objectMapper.writeValueAsString(dataMap);
-            configService.importJson(json);
-            return ResponseEntity.ok("Json importado correctamente");
+            // Convertir los bytes en un String
+            String rawJson = new String(rawJsonBytes);
+            log.info("Inicio importación JSON");
+            configService.importJson(rawJson);
+            return ResponseEntity.ok("JSON importado correctamente");
+        } catch (DuplicateKeyException e) {
+            log.warn("JSON inválido: clave duplicada detectada. Detalle: {}", e.getMessage());
+            return ResponseEntity.badRequest().body("JSON inválido: clave duplicada detectada");
         } catch (InvalidEnumValueException e) {
-            // Retornamos la info de la excepción personalizada
-            return ResponseEntity
-                    .badRequest()
-                    .body("Error al procesar json: " + e.getMessage() +
-                            ". Valores permitidos: " + String.join(", ", (Iterable<String>) e.getAllowedValues()));
-        } catch (JsonParseException e) {
-            String msg = e.getOriginalMessage();
-            if (msg != null && msg.contains("Duplicate field")) {
-                return ResponseEntity.badRequest().body("JSON inválido: clave duplicada " + msg);
-            } else {
-                return ResponseEntity.badRequest().body("JSON inválido: error de sintaxis " + msg);
-            }
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error al procesar json: " + e.getMessage());
+            log.warn("Error al procesar JSON: {}", e.getMessage());
+            return ResponseEntity.badRequest().body("Error al procesar JSON: " + e.getMessage());
         }
     }
 
@@ -134,10 +115,11 @@ public class ConfigController {
     @Operation(summary = "Generar un Json con los datos que tenemos en la base de datos")
     public ResponseEntity<String> exportJson() {
         try {
-            String rawJson = configService.exportToJson();
-            return ResponseEntity.ok(rawJson);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("{\"error\": \"Error al generar la exportación\"}");
+            String json = configService.exportToJson();
+            return ResponseEntity.ok(json);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("{\"error\": \"Error al generar la exportación\"}");
         }
     }
 }
