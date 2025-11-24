@@ -76,13 +76,72 @@
             <version>1.18.30</version>
             <scope>provided</scope>
         </dependency>
-        <dependency>
-            <groupId>com.prueba</groupId>
-            <artifactId>ejemploAPI</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
-        </dependency>
-
     </dependencies>
+
+    <profiles>
+        <!-- DEV -->
+        <profile>
+            <id>dev</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <build.profile.id>dev</build.profile.id>
+                <profileActive>dev</profileActive>
+            </properties>
+            <build>
+                <resources>
+                    <!-- Copiar todos los recursos normales -->
+                    <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                        <excludes>
+                            <exclude>env-*/**</exclude>
+                        </excludes>
+                    </resource>
+                    <resource>
+                        <directory>src/main/resources/dev</directory>
+                        <filtering>true</filtering>
+                        <includes>
+                            <include>dataSource.properties</include>
+                        </includes>
+                        <targetPath>.</targetPath>
+                    </resource>
+                </resources>
+            </build>
+        </profile>
+
+        <!-- PROD -->
+        <profile>
+            <id>prod</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <build.profile.id>prod</build.profile.id>
+                <profileActive>prod</profileActive>
+            </properties>
+            <build>
+                <resources>
+                    <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                        <excludes>
+                            <exclude>env-*/**</exclude>
+                        </excludes>
+                    </resource>
+                    <resource>
+                        <directory>src/main/resources/prod</directory>
+                        <filtering>true</filtering>
+                        <includes>
+                            <include>dataSource.properties</include>
+                        </includes>
+                        <targetPath>.</targetPath>
+                    </resource>
+                </resources>
+            </build>
+        </profile>
+    </profiles>
 
 	<build>
 		<plugins>
@@ -92,25 +151,5 @@
 			</plugin>
 		</plugins>
 	</build>
-
-    <profiles>
-
-        <!-- Perfil DEV -->
-        <profile>
-            <id>dev</id>
-            <properties>
-                <spring.profiles.active>dev</spring.profiles.active>
-            </properties>
-        </profile>
-
-        <!-- Perfil PRODUCCIÓN -->
-        <profile>
-            <id>prod</id>
-            <properties>
-                <spring.profiles.active>prod</spring.profiles.active>
-            </properties>
-        </profile>
-
-    </profiles>
 
 </project>

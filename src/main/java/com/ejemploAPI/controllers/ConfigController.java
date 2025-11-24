@@ -4,8 +4,6 @@ import com.ejemploAPI.config.exceptions.DuplicateKeyException;
 import com.ejemploAPI.config.exceptions.InvalidEnumValueException;
 import com.ejemploAPI.dtos.ConfigDTO;
 import com.ejemploAPI.services.ConfigService;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

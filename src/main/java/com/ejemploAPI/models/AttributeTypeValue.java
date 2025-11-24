@@ -1,12 +1,6 @@
 package com.ejemploAPI.models;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,6 +22,7 @@ public class AttributeTypeValue {
     @JoinColumn(name = "attribute_type_id")
     private AttributeType attributeType;
 
+    @Column(name = "`value`")
     private String value; // valor permitido para el enum
 
 }
