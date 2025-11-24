@@ -340,8 +340,11 @@ public class ConfigService {
                         if (mappedValue != null) {
                             itemConfig.setDefaultValue(mappedValue); // Guarda valor real de BBDD
                         } else {
+                            List<String> valoresValidos = attributeTypeService.getAllowedValues(baseEnumType);
+                            log.error("{}[LISTA][ERROR] El valor '{}' no es válido para el enum '{}' en la posición {}. Valores permitidos: {}",
+                                    indent, itemValue, attributeName, i, valoresValidos);
                             throw new InvalidEnumValueException(attributeName, itemValue,
-                                    attributeTypeService.getAllowedValues(baseEnumType));
+                                    valoresValidos);
                         }
                     } else {
                         itemConfig.setDefaultValue(itemValue);
