@@ -3,6 +3,8 @@ package com.ejemploAPI.services;
 import com.ejemploAPI.config.exceptions.DuplicateKeyException;
 import com.ejemploAPI.config.exceptions.InvalidEnumValueException;
 import com.ejemploAPI.config.exceptions.InvalidJsonFormatException;
+import com.ejemploAPI.dtos.ConfigDTO;
+import com.ejemploAPI.mappers.ConfigMapper;
 import com.ejemploAPI.models.Attribute;
 import com.ejemploAPI.models.AttributeType;
 import com.ejemploAPI.models.Config;
@@ -16,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +47,16 @@ public class ConfigService {
         this.objectMapper.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
     }
 
+    // Listar todos los Config
+    public List<ConfigDTO> findAll() {
+        log.debug("Obteniendo todos los Config");
+        List<ConfigDTO> list = configRepository.findAll().stream()
+                .map(ConfigMapper::toDTO)
+                .toList();
+        log.debug("Cantidad de Config encontrados: {}", list.size());
+        return list;
+    }
+
     // Devolver Config por su id
     public Config findById(Long id) {
         log.debug("Buscando Config con id = {}", id);
@@ -52,6 +65,67 @@ public class ConfigService {
                     log.error("No se encontró Config con id = {}", id);
                     return new RuntimeException("No se encontró Config con id = " + id);
                 });
+    }
+
+    public ConfigDTO getByIdDTO(Long id) {
+        Config config = findById(id);
+        return ConfigMapper.toDTO(config);
+    }
+
+    // Crear Config
+    public ConfigDTO create(ConfigDTO dto) {
+        log.debug("Creando Config con attributeId = {} y parentId = {}", dto.getAttributeId(), dto.getParentId());
+
+        Attribute attribute = null;
+        if (dto.getAttributeId() != null) {
+            attribute = attributeRepository.findById(dto.getAttributeId())
+                    .orElseThrow(() -> new RuntimeException("Attribute con id " + dto.getAttributeId() + " no existe"));
+        }
+
+        Config parent = null;
+        if (dto.getParentId() != null) {
+            parent = configRepository.findById(dto.getParentId())
+                    .orElseThrow(() -> new RuntimeException("Config padre con id " + dto.getParentId() + " no existe"));
+        }
+
+        Config saved = configRepository.save(ConfigMapper.toEntity(dto, attribute, parent));
+        log.debug("Config creado correctamente con id = {}", saved.getId());
+        return ConfigMapper.toDTO(saved);
+    }
+
+    // Actualizar Config
+    public ConfigDTO update(Long id, ConfigDTO dto) {
+        Config config = findById(id);
+        log.debug("Actualizando Config con id = {}", id);
+
+        Attribute attribute = null;
+        if (dto.getAttributeId() != null) {
+            attribute = attributeRepository.findById(dto.getAttributeId()).orElse(null);
+            if (attribute == null) log.warn("Attribute con id {} no existe, no se actualiza este campo", dto.getAttributeId());
+        }
+
+        Config parent = null;
+        if (dto.getParentId() != null) {
+            parent = configRepository.findById(dto.getParentId()).orElse(null);
+            if (parent == null) log.warn("Config padre con id {} no existe, no se actualiza este campo", dto.getParentId());
+        }
+
+        ConfigMapper.updateEntity(config, dto, attribute, parent);
+        Config saved = configRepository.save(config);
+        log.debug("Config actualizado correctamente con id = {}", saved.getId());
+        return ConfigMapper.toDTO(saved);
+    }
+
+    // Eliminar Config
+    public void delete(Long id) {
+        Config config = findById(id);
+        try {
+            configRepository.delete(config);
+            log.debug("Config eliminado correctamente con id = {}", id);
+        } catch (DataIntegrityViolationException e) {
+            log.error("No se puede eliminar Config con id = {} por integridad referencial", id);
+            throw new RuntimeException("No se puede eliminar Config con id " + id + " porque tiene elementos asociados");
+        }
     }
 
 

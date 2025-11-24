@@ -1,7 +1,9 @@
 package com.ejemploAPI.mappers;
 
 import com.ejemploAPI.dtos.ConfigDTO;
+import com.ejemploAPI.models.Attribute;
 import com.ejemploAPI.models.Config;
+import org.springframework.beans.BeanUtils;
 
 public class ConfigMapper {
 
@@ -29,6 +31,28 @@ public class ConfigMapper {
         entity.setDescripcion(dto.getDescripcion());
         entity.setApplicationNode(dto.getApplicationNode());
         entity.setIsCustom(dto.getIsCustom());
+        return entity;
+    }
+
+    /**
+     * Actualiza una entidad existente con los valores del DTO y relaciones.
+     */
+    public static void updateEntity(Config entity, ConfigDTO dto, Attribute attribute, Config parent) {
+        // Copiamos campos simples usando BeanUtils
+        BeanUtils.copyProperties(dto, entity, "id"); // no sobreescribimos el id
+
+        // Asignamos relaciones
+        entity.setAttribute(attribute);
+        entity.setParent(parent);
+    }
+
+    /**
+     * Método útil para crear entity con relaciones (POST)
+     */
+    public static Config toEntity(ConfigDTO dto, Attribute attribute, Config parent) {
+        Config entity = toEntity(dto);
+        entity.setAttribute(attribute);
+        entity.setParent(parent);
         return entity;
     }
 
