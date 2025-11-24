@@ -7,9 +7,17 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "attribute_type_value")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class AttributeTypeValue {
 
     @Id
@@ -22,12 +30,4 @@ public class AttributeTypeValue {
 
     private String value; // valor permitido para el enum
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public AttributeType getAttributeType() { return attributeType; }
-    public void setAttributeType(AttributeType attributeType) { this.attributeType = attributeType; }
-
-    public String getValue() { return value; }
-    public void setValue(String value) { this.value = value; }
 }

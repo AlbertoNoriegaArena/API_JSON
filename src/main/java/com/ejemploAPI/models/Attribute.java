@@ -6,10 +6,18 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 
 import java.util.Objects;
 
 @Entity
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Attribute {
 
     @Id
@@ -22,34 +30,5 @@ public class Attribute {
     @JoinColumn(name = "attribute_type_id")
     private AttributeType attributeType;
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public AttributeType getAttributeType() { return attributeType; }
-    public void setAttributeType(AttributeType attributeType) { this.attributeType = attributeType; }
-
-    @Override
-    public String toString() {
-        return "Attribute{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", attributeType=" + attributeType +
-                '}';
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
-        Attribute attribute = (Attribute) o;
-        return Objects.equals(id, attribute.id) && Objects.equals(name, attribute.name) && Objects.equals(attributeType, attribute.attributeType);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, name, attributeType);
-    }
 }
 
