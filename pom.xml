@@ -83,11 +83,10 @@
         <profile>
             <id>dev</id>
             <activation>
-                <activeByDefault>false</activeByDefault>
+                <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
-                <build.profile.id>dev</build.profile.id>
-                <profileActive>dev</profileActive>
+                <spring.profiles.active>dev</spring.profiles.active>
             </properties>
             <build>
                 <resources>
@@ -95,15 +94,12 @@
                     <resource>
                         <directory>src/main/resources</directory>
                         <filtering>true</filtering>
-                        <excludes>
-                            <exclude>env-*/**</exclude>
-                        </excludes>
                     </resource>
                     <resource>
                         <directory>src/main/resources/dev</directory>
                         <filtering>true</filtering>
                         <includes>
-                            <include>dataSource.properties</include>
+                            <include>*.properties</include>
                         </includes>
                         <targetPath>.</targetPath>
                     </resource>
@@ -117,24 +113,17 @@
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
-            <properties>
-                <build.profile.id>prod</build.profile.id>
-                <profileActive>prod</profileActive>
-            </properties>
             <build>
                 <resources>
                     <resource>
                         <directory>src/main/resources</directory>
                         <filtering>true</filtering>
-                        <excludes>
-                            <exclude>env-*/**</exclude>
-                        </excludes>
                     </resource>
                     <resource>
                         <directory>src/main/resources/prod</directory>
                         <filtering>true</filtering>
                         <includes>
-                            <include>dataSource.properties</include>
+                            <include>*.properties</include>
                         </includes>
                         <targetPath>.</targetPath>
                     </resource>
