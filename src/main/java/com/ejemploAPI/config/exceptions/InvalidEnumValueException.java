@@ -1,8 +1,10 @@
 package com.ejemploAPI.config.exceptions;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+@Getter
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class InvalidEnumValueException extends RuntimeException {
 
@@ -17,8 +19,5 @@ public class InvalidEnumValueException extends RuntimeException {
         this.allowedValues = allowedValues;
     }
 
-    public String getAttributeName() { return attributeName; }
-    public String getInvalidValue() { return invalidValue; }
-    public Iterable<String> getAllowedValues() { return allowedValues; }
 }
 

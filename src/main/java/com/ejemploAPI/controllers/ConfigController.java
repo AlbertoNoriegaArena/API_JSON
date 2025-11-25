@@ -105,7 +105,7 @@ public class ConfigController {
             return ResponseEntity.badRequest().body("JSON inválido: clave duplicada detectada");
         } catch (InvalidEnumValueException e) {
             log.warn("Error al procesar JSON: {}", e.getMessage());
-            return ResponseEntity.badRequest().body("Error al procesar JSON: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Error al procesar JSON: " + e.getMessage() + "valores permitidos: " + e.getAllowedValues());
         }
     }
 
