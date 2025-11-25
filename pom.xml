@@ -81,6 +81,9 @@
     <profiles>
         <profile>
             <id>dev</id>
+            <properties>
+                <spring.profiles.active>dev</spring.profiles.active>
+            </properties>
             <build>
                 <resources>
                     <resource>
@@ -93,6 +96,9 @@
 
         <profile>
             <id>prod</id>
+            <properties>
+                <spring.profiles.active>prod</spring.profiles.active>
+            </properties>
             <build>
                 <resources>
                     <resource>
