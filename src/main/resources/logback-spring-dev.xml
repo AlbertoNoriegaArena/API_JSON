@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
-    <property name="LOG_PATH" value="logs" />
+    <!-- Carpeta de logs para DEV -->
+    <property name="LOG_PATH" value="logs/dev" />
     <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n" />
 
     <!-- Consola -->
@@ -12,13 +13,16 @@
         </encoder>
     </appender>
 
-    <!-- Archivo con rotación -->
+    <!-- Archivo log con rotación -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_PATH}/app.log</file>
+        <file>${LOG_PATH}/appDev.log</file>
+
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Archivo diario comprimido -->
             <fileNamePattern>${LOG_PATH}/app.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
             <maxHistory>7</maxHistory>
         </rollingPolicy>
+
         <encoder>
             <pattern>${LOG_PATTERN}</pattern>
             <charset>UTF-8</charset>
@@ -31,10 +35,10 @@
     <logger name="com.zaxxer.hikari" level="INFO"/>
     <logger name="com.zaxxer.hikari.pool" level="INFO"/>
 
-    <!-- Tus logs personalizados en DEBUG -->
+    <!-- Tus logs en DEBUG en DEV -->
     <logger name="com.ejemploAPI" level="DEBUG"/>
 
-    <!-- Nivel global más limpio -->
+    <!-- Root en DEBUG / Se verán DEBUG en consola y fichero -->
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>

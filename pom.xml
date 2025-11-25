@@ -79,60 +79,34 @@
     </dependencies>
 
     <profiles>
-        <!-- DEV -->
         <profile>
             <id>dev</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <properties>
-                <spring.profiles.active>dev</spring.profiles.active>
-            </properties>
             <build>
                 <resources>
-                    <!-- Copiar todos los recursos normales -->
-                    <resource>
-                        <directory>src/main/resources</directory>
-                        <filtering>true</filtering>
-                    </resource>
                     <resource>
                         <directory>src/main/resources/dev</directory>
-                        <filtering>true</filtering>
-                        <includes>
-                            <include>*.properties</include>
-                        </includes>
-                        <targetPath>.</targetPath>
+                        <filtering>false</filtering>
                     </resource>
                 </resources>
             </build>
         </profile>
 
-        <!-- PROD -->
         <profile>
             <id>prod</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
             <build>
                 <resources>
                     <resource>
-                        <directory>src/main/resources</directory>
-                        <filtering>true</filtering>
-                    </resource>
-                    <resource>
                         <directory>src/main/resources/prod</directory>
-                        <filtering>true</filtering>
-                        <includes>
-                            <include>*.properties</include>
-                        </includes>
-                        <targetPath>.</targetPath>
+                        <filtering>false</filtering>
                     </resource>
                 </resources>
             </build>
         </profile>
     </profiles>
 
-	<build>
+
+
+    <build>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
