@@ -578,7 +578,7 @@ public class ConfigService {
      */
     private Object buildJsonValue(Config config, AtomicInteger totalNodesExported) {
         totalNodesExported.incrementAndGet();
-        String attrName = config.getAttribute() != null ? config.getAttribute().getName() : "(sin atributo)";
+        String attributeName = config.getAttribute() != null ? config.getAttribute().getName() : "(sin atributo)";
         Long id = config.getId();
         List<Config> children = configRepository.findByParentIdOrderByIdAsc(config.getId());
         AttributeType attrType = config.getAttribute() != null ? config.getAttribute().getAttributeType() : null;
@@ -586,7 +586,7 @@ public class ConfigService {
         // Manejo de listas
         if (attrType != null && Boolean.TRUE.equals(attrType.getIsList())) {
             log.debug("[EXPORT-LIST] '{}' (id={}) contiene {} elementos",
-                    attrName, id, children.size());
+                    attributeName, id, children.size());
             List<Object> list = new ArrayList<>();
             for (Config child : children) {
 
@@ -626,7 +626,7 @@ public class ConfigService {
 
         // Valor primitivo
         if (children.isEmpty()) {
-            log.debug("[EXPORT-PRIMITIVE] '{}' (id={}) = '{}'", attrName, id, config.getDefaultValue());
+            log.debug("[EXPORT-PRIMITIVE] '{}' (id={}) = '{}'", attributeName, id, config.getDefaultValue());
             String value = config.getDefaultValue();
             if (value == null) return null;
 
