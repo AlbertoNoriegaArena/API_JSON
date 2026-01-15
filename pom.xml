@@ -55,7 +55,7 @@
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
+			<scope>test</scope>
 		</dependency>
 
 		<dependency>
@@ -85,12 +85,6 @@
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
-            <properties>
-                <spring.profiles.active>dev</spring.profiles.active>
-                <db.name>pruebaapidev</db.name>
-                <db.user>root</db.user>
-                <db.pass>root</db.pass>
-            </properties>
             <build>
                 <resources>
                     <!-- Copia todos los recursos normales -->
@@ -119,12 +113,6 @@
         <!-- Perfil PROD -->
         <profile>
             <id>prod</id>
-            <properties>
-                <spring.profiles.active>prod</spring.profiles.active>
-                <db.name>pruebaapiprod</db.name>
-                <db.user>root</db.user>
-                <db.pass>root</db.pass>
-            </properties>
             <build>
                 <resources>
                     <resource>
